@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 #include <unordered_map>
 #include <string>
+#include <iostream>
 
 using namespace dot;
 
@@ -69,7 +70,7 @@ TEST(preprocessing, CyclicGraph) {
     }
 
     // Generate visualization
-    std::string message = "Rank Visualization:\n";
+    std::string message = "CyclicGraph Rank Visualization:\n";
     for (const auto &[rank, nodes]: rank_map) {
         message += "  Rank " + std::to_string(rank) + ": ";
         for (const auto &name : nodes) {

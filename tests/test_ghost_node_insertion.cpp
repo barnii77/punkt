@@ -119,13 +119,13 @@ TEST(preprocessing, GhostNodeInsertion) {
     }
 
     // Optionally, print out all ghost node information for debugging.
-    std::string debug_message = "Ghost Nodes:\n";
+    std::string debug_message = "GhostNodeInsertion Ghost Nodes:\n";
     for (const auto &[name, node]: dg.m_nodes) {
         if (node.m_attrs.find("@type") != node.m_attrs.end()) {
             debug_message += "  " + std::string(name) + " at rank " + std::to_string(node.m_render_attrs.m_rank) + "\n";
         }
     }
-    std::cerr << debug_message;
+    std::cout << debug_message;
 
     SUCCEED();
 }

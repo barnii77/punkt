@@ -51,11 +51,13 @@ struct Digraph {
     std::string m_source;
     std::forward_list<std::string> m_generated_sources;
     std::string_view m_name;
-    Attrs default_node_attrs;
-    Attrs default_edge_attrs;
+    Attrs m_default_node_attrs;
+    Attrs m_default_edge_attrs;
     std::unordered_map<std::string_view, Node> m_nodes;
-    size_t m_n_ghost_nodes{};
     std::vector<size_t> m_rank_counts;
+    std::vector<std::vector<std::string_view>> m_per_rank_orderings;
+    std::vector<std::unordered_map<std::string_view, size_t>> m_per_rank_orderings_index;
+    size_t m_n_ghost_nodes{};
 
     explicit Digraph();
 
@@ -73,6 +75,11 @@ struct Digraph {
     void deleteIngoingNodesVectors();
 
     void populateIngoingNodesVectors();
+
+    void computeHorizontalOrderings();
+
+private:
+    void swapNodesOnRank(std::string_view a, std::string_view b);
 };
 
 class UnexpectedTokenException final : std::exception {

@@ -1,5 +1,5 @@
 #include "punkt/dot_tokenizer.hpp"
-#include "punkt/dot_keywords.hpp"
+#include "punkt/dot_constants.hpp"
 
 #include <unordered_set>
 #include <cassert>
@@ -24,7 +24,11 @@ UnexpectedCharException::UnexpectedCharException(const char c)
 }
 
 const char *UnexpectedCharException::what() const noexcept {
-    return (std::string("Unexpected char encountered: ") + m_c).c_str();
+    const std::string msg = std::string("Unexpected char encountered: ") + m_c;
+    const auto m = new char[msg.length() + 1];
+    msg.copy(m, msg.length());
+    m[msg.length()] = '\0';
+    return m;
 }
 
 static std::string_view consumeIdent(std::string_view &s) {

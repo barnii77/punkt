@@ -51,16 +51,16 @@ TEST(parser, SimpleTest) {
     EXPECT_EQ(dg.m_name, "MyGraph");
 
     // Check that the default node attributes were captured.
-    ASSERT_TRUE(dg.default_node_attrs.find("color") != dg.default_node_attrs.end());
-    ASSERT_TRUE(dg.default_node_attrs.find("shape") != dg.default_node_attrs.end());
-    EXPECT_EQ(dg.default_node_attrs.at("color"), "red");
-    EXPECT_EQ(dg.default_node_attrs.at("shape"), "circle");
+    ASSERT_TRUE(dg.m_default_node_attrs.find("color") != dg.m_default_node_attrs.end());
+    ASSERT_TRUE(dg.m_default_node_attrs.find("shape") != dg.m_default_node_attrs.end());
+    EXPECT_EQ(dg.m_default_node_attrs.at("color"), "red");
+    EXPECT_EQ(dg.m_default_node_attrs.at("shape"), "circle");
 
     // Check that the default edge attributes were captured.
-    ASSERT_TRUE(dg.default_edge_attrs.find("style") != dg.default_edge_attrs.end());
-    ASSERT_TRUE(dg.default_edge_attrs.find("weight") != dg.default_edge_attrs.end());
-    EXPECT_EQ(dg.default_edge_attrs.at("style"), "dotted");
-    EXPECT_EQ(dg.default_edge_attrs.at("weight"), "1");
+    ASSERT_TRUE(dg.m_default_edge_attrs.find("style") != dg.m_default_edge_attrs.end());
+    ASSERT_TRUE(dg.m_default_edge_attrs.find("weight") != dg.m_default_edge_attrs.end());
+    EXPECT_EQ(dg.m_default_edge_attrs.at("style"), "dotted");
+    EXPECT_EQ(dg.m_default_edge_attrs.at("weight"), "1");
 
     // === Node Declarations ===
 
@@ -268,7 +268,7 @@ TEST(parser, ComplexCyclicTest) {
     std::unordered_map<std::string_view, std::string_view> expectedFinalNodeDefaults{
         {"color", "purple"}, {"fontsize", "12"}, {"shape", "ellipse"}, {"fontname", "Arial"}
     };
-    EXPECT_EQ(dg.default_node_attrs, expectedFinalNodeDefaults);
+    EXPECT_EQ(dg.m_default_node_attrs, expectedFinalNodeDefaults);
 
     // Final default edge attributes:
     // After "edge [style=bold]", merging with the initial edge defaults {style=solid, weight=1}
@@ -276,7 +276,7 @@ TEST(parser, ComplexCyclicTest) {
     std::unordered_map<std::string_view, std::string_view> expectedFinalEdgeDefaults{
         {"style", "bold"}, {"weight", "1"}
     };
-    EXPECT_EQ(dg.default_edge_attrs, expectedFinalEdgeDefaults);
+    EXPECT_EQ(dg.m_default_edge_attrs, expectedFinalEdgeDefaults);
 
     // === Node Declarations ===
 

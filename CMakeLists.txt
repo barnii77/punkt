@@ -14,11 +14,12 @@ add_library(punkt
         src/dot_parser.cpp
         src/compute_ranks.cpp
         src/insert_ghost_nodes.cpp
+        src/order_nodes_horizontally.cpp
 
         # header files
         include/punkt/dot_tokenizer.hpp
         include/punkt/dot.hpp
-        include/punkt/dot_keywords.hpp
+        include/punkt/dot_constants.hpp
 )
 target_include_directories(punkt PRIVATE include/)
 target_link_libraries(punkt PRIVATE glfw)
@@ -40,5 +41,6 @@ target_sources(tests PRIVATE
         tests/test_parser.cpp
         tests/test_rank_assignment.cpp
         tests/test_ghost_node_insertion.cpp
+        tests/test_horizontal_ordering.cpp
 )
 target_include_directories(tests PRIVATE tests/)

@@ -1,6 +1,6 @@
 #include "punkt/dot.hpp"
 #include "punkt/dot_tokenizer.hpp"
-#include "punkt/dot_keywords.hpp"
+#include "punkt/dot_constants.hpp"
 
 #include <utility>
 #include <ranges>
@@ -18,8 +18,12 @@ UnexpectedTokenException::UnexpectedTokenException(const tokenizer::Token &token
 }
 
 const char *UnexpectedTokenException::what() const noexcept {
-    return (std::string("Unexpected token: \"") + std::string(m_token.m_value) + "\" of type " + std::to_string(
-                static_cast<uint64_t>(m_token.m_type))).c_str();
+    const std::string msg = std::string("Unexpected token: \"") + std::string(m_token.m_value) + "\" of type " +
+                            std::to_string(static_cast<uint64_t>(m_token.m_type));
+    const auto m = new char[msg.length() + 1];
+    msg.copy(m, msg.length());
+    m[msg.length()] = '\0';
+    return m;
 }
 
 EdgeRenderAttrs::EdgeRenderAttrs()
@@ -114,12 +118,12 @@ static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::T
         // handle special keywords: for now only `node` and `edge` (which set default attrs)
         if (const std::string_view &kwd = a.m_value; kwd == KWD_NODE) {
             Attrs new_attrs = consumeAttrs(tokens);
-            mergeAttrs(dg.default_node_attrs, new_attrs);
-            dg.default_node_attrs = std::move(new_attrs);
+            mergeAttrs(dg.m_default_node_attrs, new_attrs);
+            dg.m_default_node_attrs = std::move(new_attrs);
         } else if (kwd == KWD_EDGE) {
             Attrs new_attrs = consumeAttrs(tokens);
-            mergeAttrs(dg.default_edge_attrs, new_attrs);
-            dg.default_edge_attrs = std::move(new_attrs);
+            mergeAttrs(dg.m_default_edge_attrs, new_attrs);
+            dg.m_default_edge_attrs = std::move(new_attrs);
         } else {
             throw UnexpectedTokenException(a);
         }
@@ -139,7 +143,7 @@ static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::T
         // parse attrs
         Attrs attrs = consumeAttrs(tokens);
         // handle defaults set by `node [...];`
-        mergeAttrs(dg.default_edge_attrs, attrs);
+        mergeAttrs(dg.m_default_edge_attrs, attrs);
 
         // assign attrs
         for (Edge &e: new_edges) {
@@ -154,7 +158,7 @@ static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::T
         // handle node declaration
         Attrs attrs = consumeAttrs(tokens);
         // handle defaults set by `node [...];`
-        mergeAttrs(dg.default_node_attrs, attrs);
+        mergeAttrs(dg.m_default_node_attrs, attrs);
 
         dg.m_nodes.insert_or_assign(a.m_value, Node(a.m_value, attrs));
     }
