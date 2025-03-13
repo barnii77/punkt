@@ -6,7 +6,7 @@
 #include <unordered_set>
 #include <cassert>
 
-using namespace dot;
+using namespace punkt;
 
 static void topoSortNodesImpl(Digraph &dg, Node &node, std::vector<std::reference_wrapper<Node> > &out,
                               std::unordered_set<const Node *> &visited) {
@@ -22,9 +22,19 @@ static void topoSortNodesImpl(Digraph &dg, Node &node, std::vector<std::referenc
 }
 
 static std::vector<std::reference_wrapper<Node> > topoSortNodes(Digraph &dg) {
+    // Have to copy out names and sort alphabetically because iteration order on std::unordered_map is not guaranteed.
+    // This may lead to different topologies using different STL implementations, which is undesirable.
+    std::vector<std::string_view> node_names;
+    node_names.reserve(dg.m_nodes.size());
+    for (const Node &node: std::views::values(dg.m_nodes)) {
+        node_names.emplace_back(node.m_name);
+    }
+    std::ranges::sort(node_names);
+
     std::vector<std::reference_wrapper<Node> > out;
     std::unordered_set<const Node *> visited = {};
-    for (Node &node: std::views::values(dg.m_nodes)) {
+    for (const std::string_view &name: node_names) {
+        Node &node = dg.m_nodes.at(name);
         topoSortNodesImpl(dg, node, out, visited);
     }
     return out;

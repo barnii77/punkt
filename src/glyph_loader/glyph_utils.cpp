@@ -1,0 +1,28 @@
+#include "punkt/glyph_loader/glyph_loader.hpp"
+
+using namespace render::glyph;
+
+// empty constructor should make a visible Pixel, not alpha=0
+Pixel::Pixel()
+    : r(0), g(0), b(0), a(255) {
+}
+
+Pixel::Pixel(const uint8_t r, const uint8_t g, const uint8_t b, const uint8_t a)
+    : r(r), g(g), b(b), a(a) {
+}
+
+Glyph::Glyph(std::vector<Pixel> texture, const size_t width, const size_t height)
+    : m_texture(std::move(texture)), m_width(width), m_height(height) {
+}
+
+FontNotFoundException::FontNotFoundException(std::string path)
+    : m_path(std::move(path)) {
+}
+
+const char *FontNotFoundException::what() const noexcept {
+    const std::string msg = std::string("Font not found: \"") + std::string(m_path);
+    const auto m = new char[msg.length() + 1];
+    msg.copy(m, msg.length());
+    m[msg.length()] = '\0';
+    return m;
+}

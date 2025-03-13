@@ -1,11 +1,11 @@
 #include "punkt/dot.hpp"
+#include "punkt/int_types.hpp"
 
-#include <cstdint>
 #include <ranges>
 #include <string>
 #include <cassert>
 
-using namespace dot;
+using namespace punkt;
 
 static std::string_view newGhostNode(Digraph &dg, const size_t rank) {
     const std::string name = std::string("@") + std::to_string(dg.m_n_ghost_nodes++);
@@ -45,7 +45,8 @@ static void decomposeEdgeIfRequired(Digraph &dg, Edge &edge) {
             } else {
                 // this way of deciding where to insert the ghost node will lead to alternating between inserting above
                 // and below and therefore balances the edges cleanly
-                const size_t position_seed = dg.m_rank_counts.at(rank - 1) + dg.m_rank_counts.at(rank) + dg.m_rank_counts.at(rank + 1);
+                const size_t position_seed = dg.m_rank_counts.at(rank - 1) + dg.m_rank_counts.at(rank) +
+                                             dg.m_rank_counts.at(rank + 1);
                 ghost_rank = position_seed % 2 ? rank - 1 : rank + 1;
             }
             const std::string_view ghost_name = newGhostNode(dg, ghost_rank);
@@ -66,9 +67,13 @@ static void decomposeEdgeIfRequired(Digraph &dg, Edge &edge) {
 }
 
 void Digraph::insertGhostNodes() {
-    for (Node &node: std::views::values(m_nodes)) {
-        for (Edge &edge: node.m_outgoing) {
-            decomposeEdgeIfRequired(*this, edge);
+    auto keys = std::views::keys(m_nodes);
+    for (const std::vector real_node_names(keys.begin(), keys.end());
+         const std::string_view &name: real_node_names) {
+        Node &node = m_nodes.at(name);
+        const size_t n_edges = node.m_outgoing.size();
+        for (size_t i = 0; i < n_edges; i++) {
+            decomposeEdgeIfRequired(*this, node.m_outgoing.at(i));
         }
     }
 }

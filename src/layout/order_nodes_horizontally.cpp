@@ -23,7 +23,7 @@
 // Except they won't be completely random. I will actually throw the randomly permuted graphs into a barycenter algo
 // first, which is what graphviz does, and that way I hope to produce reasonable starting points.
 
-using namespace dot;
+using namespace punkt;
 
 static void populateOrderingIndexAtRank(Digraph &dg, const size_t rank) {
     for (size_t x = 0; x < dg.m_per_rank_orderings[rank].size(); x++) {
@@ -122,12 +122,8 @@ static size_t reduceSum(const size_t *in, const size_t stride, const size_t n) {
     return s;
 }
 
-// assumes all values in `in` are 0 or 1 (this is meant to take in slices of connection_mat).
-// This function takes an array of 0s and 1s and computes the median of that array as if in[i] indicated whether `i` was
-// in the array to compute the median of or not. The computation performed is equivalent to iterating over all n items
-// in `in` and creating vector<size_t> to which we push every index `i` where `in[i] == 1`. If all values in `in` are
-// zeros (i.e. the array we are trying to compute the median of is empty), we return `default_value`.
-static size_t medianIndex(const size_t *in, const size_t stride, const size_t n, const size_t default_value) {
+static float medianBarycenterX(const float *barycenters, const size_t *in, const size_t stride, const size_t n,
+                               const float default_value) {
     assert(n > 0);
     const size_t n_elems = reduceSum(in, stride, n);
     if (n_elems == 0) {
@@ -142,7 +138,7 @@ static size_t medianIndex(const size_t *in, const size_t stride, const size_t n,
         n_ones_encountered += value;
     }
     assert(i > 0);
-    size_t median = --i;
+    float median = barycenters[--i];
     if (n_elems % 2 == 0) {
         // we need to average
         while (in[i * stride] == 0) {
@@ -150,9 +146,25 @@ static size_t medianIndex(const size_t *in, const size_t stride, const size_t n,
             i++;
         }
         assert(in[i * stride] == 1);
-        median = (median + i) / 2;
+        median = (median + barycenters[i]) / 2;
     }
     return median;
+}
+
+static float meanBarycenterX(const float *barycenters, const size_t *in, const size_t stride, const size_t n,
+                             const float default_value) {
+    assert(n > 0);
+    const size_t n_elems = reduceSum(in, stride, n);
+    if (n_elems == 0) {
+        return default_value;
+    }
+    float out = 0;
+    for (size_t i = 0; i < n; i++) {
+        const size_t value = in[i * stride];
+        assert(value < 2);
+        out += barycenters[i] * static_cast<float>(value);
+    }
+    return out / static_cast<float>(n_elems);
 }
 
 // computes the prefix sum and stores it into out. Assumes in and out have same layout.
@@ -239,40 +251,67 @@ void Digraph::swapNodesOnRank(const std::string_view a, const std::string_view b
     ordering[a_idx] = b, ordering[b_idx] = a;
 }
 
-static void barycenterSweep(Digraph &dg, const bool is_upward_sweep, bool &improvement_found) {
+static void barycenterSweep(Digraph &dg, const bool is_downward_sweep, bool &improvement_found, float &total_change) {
     // iterates ranks [n - 1, 0) if is_upward_pass else [0, n - 1)
-    size_t start = 0, end = dg.m_per_rank_orderings.size() - 1;
-    int rank_step = 1;
-    if (is_upward_sweep) {
-        std::swap(start, end);
+    ssize_t start, end;
+    int rank_step;
+    if (is_downward_sweep) {
+        start = 1;
+        end = static_cast<ssize_t>(dg.m_per_rank_orderings.size());
+        rank_step = 1;
+    } else {
+        start = static_cast<ssize_t>(dg.m_per_rank_orderings.size()) - 2;
+        end = -1;
         rank_step = -1;
     }
 
-    for (size_t rank = start; rank != end; rank += rank_step) {
-        connection_mat.populate(dg, rank - static_cast<size_t>(is_upward_sweep));
+    for (ssize_t rank = start; rank != end; rank += rank_step) {
+        connection_mat.populate(dg, rank - static_cast<size_t>(is_downward_sweep));
 
-        size_t n_medians = connection_mat.m_h, inner_dim = connection_mat.m_w,
+        size_t n_barycenters = connection_mat.m_h, inner_dim = connection_mat.m_w,
                 outer_stride = connection_mat.m_w, inner_stride = 1;
-        if (is_upward_sweep) {
-            std::swap(n_medians, inner_dim);
+        if (is_downward_sweep) {
+            std::swap(n_barycenters, inner_dim);
             std::swap(outer_stride, inner_stride);
         }
-        assert(n_medians == dg.m_per_rank_orderings.at(rank).size());
 
-        std::vector<size_t> medians(n_medians);
-        for (size_t i = 0; i < n_medians; i++) {
-            const size_t median = medianIndex(connection_mat.m_data.data() + i * outer_stride, inner_stride, inner_dim,
-                                              i);
-            medians[i] = static_cast<size_t>(std::lerp(static_cast<float>(i), static_cast<float>(median),
-                                                       BARYCENTER_ORDERING_DAMPENING));
+        assert(n_barycenters == dg.m_per_rank_orderings.at(rank).size());
+        assert(inner_dim == dg.m_per_rank_orderings.at(rank - rank_step).size());
+
+        std::vector<float> new_barycenters(n_barycenters);
+        std::vector<float> current_other_rank_barycenters(inner_dim);
+        for (size_t i = 0; i < inner_dim; i++) {
+            const auto &node_name = dg.m_per_rank_orderings.at(rank - rank_step).at(i);
+            const auto &node = dg.m_nodes.at(node_name);
+            current_other_rank_barycenters[i] = node.m_render_attrs.m_barycenter_x;
+        }
+        for (size_t i = 0; i < n_barycenters; i++) {
+            float p;
+            const auto &node_name = dg.m_per_rank_orderings.at(rank).at(i);
+            auto &node = dg.m_nodes.at(node_name);
+            if (BARYCENTER_USE_MEDIAN) {
+                p = medianBarycenterX(current_other_rank_barycenters.data(),
+                                      connection_mat.m_data.data() + i * outer_stride,
+                                      inner_stride, inner_dim, node.m_render_attrs.m_barycenter_x);
+            } else {
+                p = meanBarycenterX(current_other_rank_barycenters.data(),
+                                    connection_mat.m_data.data() + i * outer_stride,
+                                    inner_stride, inner_dim, node.m_render_attrs.m_barycenter_x);
+            }
+            const float new_barycenter =
+                    std::lerp(node.m_render_attrs.m_barycenter_x, p, BARYCENTER_ORDERING_DAMPENING);
+            const float change = std::abs(new_barycenter - node.m_render_attrs.m_barycenter_x);
+            total_change += change;
+            node.m_render_attrs.m_barycenter_x = new_barycenter;
+            new_barycenters[i] = new_barycenter;
         }
 
-        std::vector<size_t> rearrangement_order(n_medians);
+        std::vector<size_t> rearrangement_order(n_barycenters);
         for (size_t i = 0; i < rearrangement_order.size(); i++) {
             rearrangement_order[i] = i;
         }
         std::ranges::sort(rearrangement_order, [&](const size_t a, const size_t b) {
-            return medians.at(a) < medians.at(b);
+            return new_barycenters.at(a) < new_barycenters.at(b);
         });
         bool rearrangement_order_has_effect = false;
         for (size_t i = 0; i < rearrangement_order.size(); i++) {
@@ -282,7 +321,7 @@ static void barycenterSweep(Digraph &dg, const bool is_upward_sweep, bool &impro
             }
         }
         if (!rearrangement_order_has_effect) {
-            return;
+            continue;
         }
 
         // rearrange orderings vector according to rearrangement order
@@ -291,6 +330,12 @@ static void barycenterSweep(Digraph &dg, const bool is_upward_sweep, bool &impro
         rearranged_ordering.reserve(ordering.size());
         for (const size_t idx: rearrangement_order) {
             rearranged_ordering.emplace_back(ordering.at(idx));
+        }
+        // TODO revert to old medianIndex/meanIndex mechanism if this works (it currently doesn't)
+        for (size_t i = 0; i < n_barycenters; i++) {
+            const auto &node_name = dg.m_per_rank_orderings.at(rank).at(i);
+            auto &node = dg.m_nodes.at(node_name);
+            node.m_render_attrs.m_barycenter_x = static_cast<float>(i);
         }
 
         // const float old_score = getRankOrderingScore(dg, rank);
@@ -313,18 +358,36 @@ void Digraph::computeHorizontalOrderings() {
     m_per_rank_orderings_index.resize(m_rank_counts.size());
     populateInitialOrderings(*this);
 
+    // populate barycenter x on each node
+    for (size_t rank = 0; rank < m_rank_counts.size(); rank++) {
+        for (size_t i = 0; i < m_rank_counts[rank]; i++) {
+            const auto &node_name = m_per_rank_orderings.at(rank).at(i);
+            auto &node = m_nodes.at(node_name);
+            node.m_render_attrs.m_barycenter_x = static_cast<float>(i);
+        }
+    }
+
+    // TODO barycenter still doesn't converge and just gets stuck... I am probably doing something wrong
     // run median barycenter iterations of alternating up and down sweeps
     for (ssize_t barycenter_iter = 0; barycenter_iter < BARYCENTER_ORDERING_MAX_ITERS ||
                                       BARYCENTER_ORDERING_MAX_ITERS < 0; barycenter_iter++) {
         bool improvement_found = false;
-        for (const bool is_upward_sweep: {false, true}) {
-            barycenterSweep(*this, is_upward_sweep, improvement_found);
+        float total_change = 0.0f;
+        for (const bool is_downward_sweep: {false, true}) {
+            barycenterSweep(*this, is_downward_sweep, improvement_found, total_change);
         }
-        if (!improvement_found) {
+        // TODO remove this
+        total_change = 0.0f;
+        if (const float average_change = total_change / static_cast<float>(m_nodes.size());
+            !improvement_found && average_change < BARYCENTER_MIN_AVERAGE_CHANGE_REQUIRED *
+            BARYCENTER_ORDERING_DAMPENING) {
             break;
         }
     }
 
+    if (BUBBLE_ORDERING_MAX_ITERS == 0) {
+        return;
+    }
     // reorder bubble-sort style until no adjacent node swap increases the score
     std::vector<float> rank_scores(m_per_rank_orderings.size());
     for (size_t rank = 0; rank < rank_scores.size(); rank++) {

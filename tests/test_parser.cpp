@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include <algorithm>
 
-using namespace dot;
+using namespace punkt;
 
 TEST(parser, SimpleTest) {
     // This DOT source tests:

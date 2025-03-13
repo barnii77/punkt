@@ -1,10 +1,11 @@
+#include "punkt/dot.hpp"
 #include "punkt/dot_tokenizer.hpp"
 #include "punkt/dot_constants.hpp"
 
 #include <unordered_set>
 #include <cassert>
 
-using namespace dot::tokenizer;
+using namespace punkt::tokenizer;
 
 static std::unordered_set<std::string_view> keywords = {
     KWD_EDGE,
@@ -34,7 +35,7 @@ const char *UnexpectedCharException::what() const noexcept {
 static std::string_view consumeIdent(std::string_view &s) {
     assert(!s.empty());
     size_t n = 0;
-    while (n < s.length() && std::isalnum(s.at(n))) {
+    while (n < s.length() && (std::isalnum(s.at(n)) || s.at(n) == '_' || s.at(n) == '.')) {
         n++;
     }
 
@@ -47,15 +48,15 @@ static bool isKwd(const std::string_view &s) {
     return keywords.contains(s);
 }
 
-std::vector<Token> dot::tokenizer::tokenize(std::string_view s) {
+std::vector<Token> punkt::tokenizer::tokenize(Digraph &dg, std::string_view s) {
     std::vector<Token> out;
 
     while (!s.empty()) {
         size_t advance_by = 0;
 
-        if (char c = s.front(); std::isalnum(c)) {
+        if (char c = s.front(); std::isalnum(c) || c == '_' || c == '.') {
             std::string_view ident = consumeIdent(s);
-            out.emplace_back(ident, isKwd(ident) ? Token::Type::kwd : Token::Type::ident);
+            out.emplace_back(ident, isKwd(ident) ? Token::Type::kwd : Token::Type::string);
         } else if (c == '[') {
             out.emplace_back("[", Token::Type::lsq);
             advance_by = 1;
@@ -98,12 +99,28 @@ std::vector<Token> dot::tokenizer::tokenize(std::string_view s) {
                 advance_by++;
             }
         } else if (c == '"') {
-            // handle strings
+            // handle strings (which are Token::Type::ident)
             advance_by = 1;
             // advance until end of string
             bool prev_was_backslash = false;
-            while (advance_by < s.length() && (s.at(advance_by) != '"' || prev_was_backslash)) {
-                prev_was_backslash = s.at(advance_by) == '\\';
+            std::vector<char> accum;
+            bool has_special_chars = false;
+            while (advance_by < s.length() && ((c = s.at(advance_by)) != '"' || prev_was_backslash)) {
+                if (prev_was_backslash && c == 'n') {
+                    accum.emplace_back('\n');
+                    has_special_chars = true;
+                } else if (prev_was_backslash && c == '\\') {
+                    accum.emplace_back('\\');
+                    has_special_chars = true;
+                } else if (prev_was_backslash && c == 't' || c == '\t') {
+                    // lazy tab handling
+                    for (size_t i = 0; i < 4; i++) {
+                        accum.emplace_back(' ');
+                    }
+                } else if (c != '\\') {
+                    accum.emplace_back(c);
+                }
+                prev_was_backslash = c == '\\';
                 advance_by++;
             }
             if (advance_by < s.length()) {
@@ -115,7 +132,12 @@ std::vector<Token> dot::tokenizer::tokenize(std::string_view s) {
             }
             assert(advance_by >= 2);
             const size_t n = advance_by - 2;  // remove quotation marks
-            out.emplace_back(s.substr(1, n), Token::Type::string);
+            if (has_special_chars) {
+                dg.m_generated_sources.emplace_front(accum.begin(), accum.end());
+                out.emplace_back(dg.m_generated_sources.front(), Token::Type::string);
+            } else {
+                out.emplace_back(s.substr(1, n), Token::Type::string);
+            }
         } else if (std::isspace(c)) {
             advance_by = 1;
         } else {

@@ -1,17 +1,43 @@
 #include "punkt/dot.hpp"
 #include "punkt/dot_tokenizer.hpp"
 #include "punkt/dot_constants.hpp"
+#include "punkt/int_types.hpp"
 
 #include <utility>
+#include <array>
 #include <ranges>
 #include <algorithm>
 #include <vector>
 #include <span>
-#include <cstdint>
 #include <optional>
 #include <cassert>
 
-using namespace dot;
+using namespace punkt;
+
+IllegalAttributeException::IllegalAttributeException(std::string attr, std::string value)
+    : m_attr(std::move(attr)), m_value(std::move(value)) {
+}
+
+const char *IllegalAttributeException::what() const noexcept {
+    const std::string msg = std::string("Invalid attribute: \"") + std::string(m_attr) + "\" with value \"" + m_value +
+                            "\"";
+    const auto m = new char[msg.length() + 1];
+    msg.copy(m, msg.length());
+    m[msg.length()] = '\0';
+    return m;
+}
+
+ReservedIdentifierException::ReservedIdentifierException(std::string name)
+    : m_name(std::move(name)) {
+}
+
+const char *ReservedIdentifierException::what() const noexcept {
+    const std::string msg = std::string("Usage of reserved identifier \"") + m_name + "\"";
+    const auto m = new char[msg.length() + 1];
+    msg.copy(m, msg.length());
+    m[msg.length()] = '\0';
+    return m;
+}
 
 UnexpectedTokenException::UnexpectedTokenException(const tokenizer::Token &token)
     : m_token(token) {
@@ -88,10 +114,9 @@ static Attrs consumeAttrs(std::span<tokenizer::Token> &tokens) {
 
     while (!nextTokenIs(tokens, tokenizer::Token::Type::rsq)) {
         // parse key=value pair
-        std::string_view key = expectAndConsume(tokens, tokenizer::Token::Type::ident).m_value;
+        std::string_view key = expectAndConsume(tokens, tokenizer::Token::Type::string).m_value;
         expectAndConsume(tokens, tokenizer::Token::Type::equals);
-        static std::array value_expected_types = {tokenizer::Token::Type::ident, tokenizer::Token::Type::string};
-        std::string_view value = expectAndConsumeOneOf(tokens, value_expected_types).m_value;
+        std::string_view value = expectAndConsume(tokens, tokenizer::Token::Type::string).m_value;
         attrs.insert_or_assign(key, value);
         if (nextTokenIs(tokens, tokenizer::Token::Type::comma)) {
             expectAndConsume(tokens, tokenizer::Token::Type::comma);
@@ -110,10 +135,25 @@ static void mergeAttrs(const Attrs &a, Attrs &b) {
     b.insert(a.begin(), a.end());
 }
 
+static void validateNodeName(const std::string_view &name) {
+    if (name.starts_with("@")) {
+        throw ReservedIdentifierException(std::string(name));
+    }
+}
+
+static void validateAttrs(const Attrs &attrs) {
+    for (const std::string_view &attr: std::views::keys(attrs)) {
+        if (attr.starts_with("@")) {
+            throw ReservedIdentifierException(std::string(attr));
+        }
+    }
+}
+
 static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::Token> &tokens) {
     // TODO handle clusters and sub-graphs here
-    static std::array expected_token_types = {tokenizer::Token::Type::ident, tokenizer::Token::Type::kwd};
+    static std::array expected_token_types = {tokenizer::Token::Type::string, tokenizer::Token::Type::kwd};
     tokenizer::Token a = expectAndConsumeOneOf(tokens, expected_token_types);
+
     if (a.m_type == tokenizer::Token::Type::kwd) {
         // handle special keywords: for now only `node` and `edge` (which set default attrs)
         if (const std::string_view &kwd = a.m_value; kwd == KWD_NODE) {
@@ -128,13 +168,14 @@ static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::T
             throw UnexpectedTokenException(a);
         }
     } else if (nextTokenIs(tokens, tokenizer::Token::Type::arrow)) {
+        validateNodeName(a.m_value);
         // handle edge declaration(s)
         implicitCreateNodeIfNotExists(dg, a.m_value);
         std::vector<Edge> new_edges;
 
         do {
             expectAndConsume(tokens, tokenizer::Token::Type::arrow);
-            const tokenizer::Token b = expectAndConsume(tokens, tokenizer::Token::Type::ident);
+            const tokenizer::Token b = expectAndConsume(tokens, tokenizer::Token::Type::string);
             implicitCreateNodeIfNotExists(dg, b.m_value);
             new_edges.emplace_back(a.m_value, b.m_value);
             a = b;
@@ -142,6 +183,7 @@ static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::T
 
         // parse attrs
         Attrs attrs = consumeAttrs(tokens);
+        validateAttrs(attrs);
         // handle defaults set by `node [...];`
         mergeAttrs(dg.m_default_edge_attrs, attrs);
 
@@ -154,9 +196,16 @@ static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::T
         for (Edge &e: new_edges) {
             dg.m_nodes.at(e.m_source).m_outgoing.emplace_back(std::move(e));
         }
+    } else if (nextTokenIs(tokens, tokenizer::Token::Type::equals)) {
+        // handle graph attribute
+        expectAndConsume(tokens, tokenizer::Token::Type::equals);
+        auto v = expectAndConsume(tokens, tokenizer::Token::Type::string);
+        dg.m_attrs.insert_or_assign(a.m_value, v.m_value);
     } else {
+        validateNodeName(a.m_value);
         // handle node declaration
         Attrs attrs = consumeAttrs(tokens);
+        validateAttrs(attrs);
         // handle defaults set by `node [...];`
         mergeAttrs(dg.m_default_node_attrs, attrs);
 
@@ -171,11 +220,11 @@ Digraph::Digraph() = default;
 
 Digraph::Digraph(std::string source)
     : m_source(std::move(source)) {
-    std::vector<tokenizer::Token> tokens_vec = tokenizer::tokenize(m_source);
+    std::vector<tokenizer::Token> tokens_vec = tokenizer::tokenize(*this, m_source);
     std::span tokens = tokens_vec;
 
     expectAndConsume(tokens, tokenizer::Token::Type::kwd, KWD_DIGRAPH);
-    m_name = expectAndConsume(tokens, tokenizer::Token::Type::ident).m_value;
+    m_name = expectAndConsume(tokens, tokenizer::Token::Type::string).m_value;
     expectAndConsume(tokens, tokenizer::Token::Type::lcurly);
     while (!tokens.empty() && !nextTokenIs(tokens, tokenizer::Token::Type::rcurly)) {
         consumeStatementAndUpdateDigraph(*this, tokens);

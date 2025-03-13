@@ -5,7 +5,7 @@
 #include <map>
 #include <iostream>
 
-using namespace dot;
+using namespace punkt;
 
 TEST(preprocessing, GhostNodeInsertion) {
     // Define a graph with nodes and edges chosen to exercise ghost node insertion:

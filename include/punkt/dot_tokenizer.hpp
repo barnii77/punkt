@@ -4,11 +4,14 @@
 #include <string>
 #include <vector>
 
-namespace dot::tokenizer {
+namespace punkt {
+struct Digraph;
+}
+
+namespace punkt::tokenizer {
 struct Token {
     enum class Type {
         eos = -1,
-        ident,
         string,
         kwd,
         lsq,
@@ -30,7 +33,7 @@ struct Token {
     bool operator==(const Token &other) const;
 };
 
-std::vector<Token> tokenize(std::string_view s);
+std::vector<Token> tokenize(Digraph &dg, std::string_view s);
 
 class UnexpectedCharException final : std::exception {
     char m_c;

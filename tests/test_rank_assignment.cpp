@@ -4,7 +4,7 @@
 #include <string>
 #include <iostream>
 
-using namespace dot;
+using namespace punkt;
 
 TEST(preprocessing, RankAssignment) {
     // Define a DAG in DOT language.
@@ -12,13 +12,13 @@ TEST(preprocessing, RankAssignment) {
         digraph DAG {
             node [color=black];
             A;
-            B;
+            "B with fancy name";
             C;
             D;
             E;
-            A -> B;
+            A -> "B with fancy name";
             A -> C;
-            B -> D;
+            "B with fancy name" -> D;
             C -> D;
             D -> E;
         }
@@ -28,12 +28,13 @@ TEST(preprocessing, RankAssignment) {
     Digraph dg(dot_source);
 
     // Run the preprocessing step, which computes node ranks.
-    dg.preprocess();
+    render::glyph::GlyphLoader glyph_loader;
+    dg.preprocess(glyph_loader);
 
     // Expected ranks for each node.
     std::unordered_map<std::string_view, size_t> expectedRanks{
         {"A", 0},
-        {"B", 1},
+        {"B with fancy name", 1},
         {"C", 1},
         {"D", 2},
         {"E", 3}
@@ -52,33 +53,52 @@ TEST(preprocessing, RankAssignment) {
 TEST(preprocessing, CyclicGraph) {
     const std::string dot_source = R"(
         digraph CyclicGraph {
-            A -> B;
-            B -> C;
+            A -> B -> C -> D -> E;
             C -> A; // Cycle
-            C -> D;
-            D -> E;
+            // A -> B;
+            // B -> C;
+            // C -> D;
+            // D -> E;
         }
     )";
 
-    Digraph g{dot_source};
-    g.preprocess();
+    Digraph dg{dot_source};
+    render::glyph::GlyphLoader glyph_loader;
+    dg.preprocess(glyph_loader);
 
-    // Group nodes by rank
-    std::map<size_t, std::vector<std::string>> rank_map;
-    for (const auto &[name, node]: g.m_nodes) {
-        rank_map[node.m_render_attrs.m_rank].emplace_back(name);
-    }
+    const std::vector<std::vector<std::string_view> > expected_orderings = {
+        {"A"},
+        {},
+        {"C"},
+        {"D"},
+        {"E"},
+    };
 
-    // Generate visualization
-    std::string message = "CyclicGraph Rank Visualization:\n";
-    for (const auto &[rank, nodes]: rank_map) {
-        message += "  Rank " + std::to_string(rank) + ": ";
-        for (const auto &name : nodes) {
-            message += name + " ";
+    std::cout << "CyclicGraph Rank Visualization:" << std::endl;
+    for (size_t rank = 0; const auto &ordering: dg.m_per_rank_orderings) {
+        std::cout << "  Rank " << rank << ": ";
+        for (const auto &node: ordering) {
+            std::cout << node << " ";
         }
-        message += '\n';
+        std::cout << std::endl;
+        rank++;
     }
 
-    std::cout << message;
-    SUCCEED();
+    // Check that computed orderings match expected orderings.
+    ASSERT_EQ(dg.m_per_rank_orderings.size(), expected_orderings.size())
+        << "Rank ordering vector size mismatch.";
+
+    for (size_t rank = 0; rank < expected_orderings.size(); rank++) {
+        const auto &expected = expected_orderings[rank];
+        const auto &actual = dg.m_per_rank_orderings[rank];
+        if (expected.empty()) {
+            continue;
+        }
+        ASSERT_EQ(actual.size(), expected.size()) << "Rank " << rank << " size mismatch.";
+        for (size_t i = 0; i < expected.size(); i++) {
+            EXPECT_EQ(actual[i], expected[i])
+                  << "Mismatch at rank " << rank << ", index " << i
+                  << " (expected " << expected[i] << ", got " << actual[i] << ")";
+        }
+    }
 }
