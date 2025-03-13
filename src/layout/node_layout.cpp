@@ -48,9 +48,26 @@ void Node::populateRenderInfo(render::glyph::GlyphLoader &glyph_loader) {
     const float margin = m_attrs.contains("margin") ? stringViewToFloat(m_attrs.at("margin"), "margin") : 0.11f;
     const std::string_view shape = m_attrs.contains("shape") ? m_attrs.at("shape") : default_shape;
     const float pen_width = m_attrs.contains("penwidth") ? stringViewToFloat(m_attrs.at("penwidth"), "penwidth") : 1.0f;
+    constexpr size_t dpi = DEFAULT_DPI; // TODO handle custom DPI settings
 
     if (const std::string_view type = m_attrs.contains("@type") ? m_attrs.at("@type") : ""; type == "ghost") {
-        // TODO handle ghost nodes (height = 1, width = 2 * edge_thickness)
+        assert(m_render_attrs.m_is_ghost);
+        m_render_attrs.m_height = 1;
+        assert(m_outgoing.size() == 1);
+        assert(m_ingoing.size() == 1);
+
+        const Edge &edge_out = m_outgoing.at(0);
+        const Edge &edge_in = m_ingoing.at(0);
+        const float edge_pen_width = edge_out.m_attrs.contains("penwidth")
+                                         ? stringViewToFloat(edge_out.m_attrs.at("penwidth"), "penwidth")
+                                         : 1.0f;
+        const auto edge_thickness = static_cast<size_t>(
+            edge_pen_width * static_cast<float>(dpi) / static_cast<float>(DEFAULT_DPI));
+
+        assert(!edge_out.m_attrs.contains("penwidth") && !edge_in.m_attrs.contains("penwidth") ||
+            edge_out.m_attrs.at("penwidth") == edge_in.m_attrs.at("penwidth"));
+
+        m_render_attrs.m_width = edge_thickness;
         return;
     }
 
@@ -63,7 +80,7 @@ void Node::populateRenderInfo(render::glyph::GlyphLoader &glyph_loader) {
     line_widths.reserve(std::ranges::count(text, '\n') + 1);
 
     // build quads but (0, 0) is top left character for now (should later be bounding box of quad)
-    const float f_font_size = static_cast<float>(font_size);
+    const auto f_font_size = static_cast<float>(font_size);
     size_t x = 0, y = font_size, line = 0;
     for (size_t i = 0; i < text.length(); i++) {
         size_t x_prev = x;
@@ -104,7 +121,6 @@ void Node::populateRenderInfo(render::glyph::GlyphLoader &glyph_loader) {
     // TODO handle padding for non-rectangular node shapes (ellipse, oval)
     assert(shape == "box" || shape == "rect" || shape == "none");
 
-    constexpr size_t dpi = DEFAULT_DPI; // TODO handle custom DPI settings
     auto border_thickness = static_cast<size_t>(pen_width * static_cast<float>(dpi) / static_cast<float>(DEFAULT_DPI));
     if (shape == "none") {
         border_thickness = 0;

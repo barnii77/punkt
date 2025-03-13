@@ -1,4 +1,5 @@
 #include "punkt/dot.hpp"
+
 #include "punkt/int_types.hpp"
 
 using namespace punkt;
@@ -30,7 +31,9 @@ void Digraph::preprocess(render::glyph::GlyphLoader &glyph_loader) {
     // per rank reordering of nodes for crossover and edge length minimization
     computeHorizontalOrderings();
 
+    populateIngoingNodesVectors();
+    // compute graph layout
     computeNodeLayouts(glyph_loader);
-
     computeGraphLayout();
+    computeEdgeLayout();
 }

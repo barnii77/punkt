@@ -20,8 +20,15 @@ struct GlyphQuad {
     GlyphQuad(size_t left, size_t top, size_t right, size_t bottom, char32_t c);
 };
 
+template<typename T>
+struct Vector2 {
+    T x;
+    T y;
+};
+
 struct EdgeRenderAttrs {
-    bool m_is_visible;
+    std::vector<Vector2<size_t>> m_trajectory;
+    bool m_is_visible{};
 
     explicit EdgeRenderAttrs();
 };
@@ -105,6 +112,8 @@ struct Digraph {
     void computeNodeLayouts(render::glyph::GlyphLoader &glyph_loader);
 
     void computeGraphLayout();
+
+    void computeEdgeLayout();
 
 private:
     void swapNodesOnRank(std::string_view a, std::string_view b);

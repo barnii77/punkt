@@ -23,6 +23,7 @@ add_library(punkt
         src/glyph_loader/glyph_utils.cpp
         src/layout/node_layout.cpp
         src/layout/graph_layout.cpp
+        src/layout/edge_layout.cpp
 
         # header files
         include/punkt/dot.hpp
