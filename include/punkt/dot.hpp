@@ -14,10 +14,10 @@ namespace punkt {
 using Attrs = std::unordered_map<std::string_view, std::string_view>;
 
 struct GlyphQuad {
-    size_t left, top, right, bottom;
-    char32_t c;
+    size_t m_left, m_top, m_right, m_bottom;
+    render::glyph::GlyphCharInfo m_c;
 
-    GlyphQuad(size_t left, size_t top, size_t right, size_t bottom, char32_t c);
+    GlyphQuad(size_t left, size_t top, size_t right, size_t bottom, render::glyph::GlyphCharInfo c);
 };
 
 template<typename T>
@@ -26,8 +26,15 @@ struct Vector2 {
     T y;
 };
 
+template<typename T>
+struct Vector3 {
+    T x;
+    T y;
+    T z;
+};
+
 struct EdgeRenderAttrs {
-    std::vector<Vector2<size_t>> m_trajectory;
+    std::vector<Vector2<size_t> > m_trajectory;
     bool m_is_visible{};
 
     explicit EdgeRenderAttrs();
@@ -74,6 +81,28 @@ struct DigraphRenderAttrs {
     std::vector<RankRenderAttrs> m_rank_render_attrs;
 };
 
+struct Digraph;
+
+struct GraphRenderer {
+    void *m_graph_renderer{};
+
+    explicit GraphRenderer();
+
+    ~GraphRenderer();
+
+    void initialize(const Digraph &dg, render::glyph::GlyphLoader &glyph_loader);
+
+    void notifyFramebufferSize(int width, int height) const;
+
+    void renderFrame() const;
+
+    void updateZoom(float factor) const;
+
+    void resetZoom() const;
+
+    void notifyCursorMovement(double dx, double dy) const;
+};
+
 struct Digraph {
     // Digraph takes ownership of the source for safety because there are string_view's to the source everywhere
     std::string m_source;
@@ -86,9 +115,11 @@ struct Digraph {
     std::vector<std::vector<std::string_view> > m_per_rank_orderings;
     std::vector<std::unordered_map<std::string_view, size_t> > m_per_rank_orderings_index;
     size_t m_n_ghost_nodes{};
-    // graph attrs also exist
+    // graph attrs also exist. They store attributes like ranksep, nodesep, etc.
     Attrs m_attrs;
     DigraphRenderAttrs m_render_attrs;
+    // wrapped in unique pointer for convenience, so I can make it opaque without having to manually deallocate
+    GraphRenderer m_renderer;
 
     explicit Digraph();
 

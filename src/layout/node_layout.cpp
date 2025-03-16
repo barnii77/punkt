@@ -10,7 +10,6 @@
 
 constexpr size_t default_font_size = 14;
 constexpr float extra_padding_factor = 1.2f;
-constexpr std::string_view default_shape = "box";
 constexpr size_t min_padding = 4; // pixels
 
 using namespace punkt;
@@ -33,8 +32,9 @@ static TextAlignment textAlignmentFromStr(const std::string_view &s) {
     }
 }
 
-GlyphQuad::GlyphQuad(const size_t left, const size_t top, const size_t right, const size_t bottom, const char32_t c)
-    : left(left), top(top), right(right), bottom(bottom), c(c) {
+GlyphQuad::GlyphQuad(const size_t left, const size_t top, const size_t right, const size_t bottom,
+                     const render::glyph::GlyphCharInfo c)
+    : m_left(left), m_top(top), m_right(right), m_bottom(bottom), m_c(c) {
 }
 
 void Node::populateRenderInfo(render::glyph::GlyphLoader &glyph_loader) {
@@ -61,6 +61,7 @@ void Node::populateRenderInfo(render::glyph::GlyphLoader &glyph_loader) {
         const float edge_pen_width = edge_out.m_attrs.contains("penwidth")
                                          ? stringViewToFloat(edge_out.m_attrs.at("penwidth"), "penwidth")
                                          : 1.0f;
+        // TODO handle custom dpi
         const auto edge_thickness = static_cast<size_t>(
             edge_pen_width * static_cast<float>(dpi) / static_cast<float>(DEFAULT_DPI));
 
@@ -88,7 +89,8 @@ void Node::populateRenderInfo(render::glyph::GlyphLoader &glyph_loader) {
         const render::glyph::Glyph &glyph = glyph_loader.getGlyph(c, font_size);
         x += glyph.m_width;
         if (glyph.m_width * glyph.m_height > 0) {
-            m_render_attrs.m_quads.emplace_back(x_prev, y - font_size, x, y, c);
+            m_render_attrs.m_quads.emplace_back(x_prev, y - font_size, x, y,
+                                                render::glyph::GlyphCharInfo(c, font_size));
         }
         quad_lines.emplace_back(line);
         if (c == '\n') {
@@ -113,8 +115,8 @@ void Node::populateRenderInfo(render::glyph::GlyphLoader &glyph_loader) {
 
             // shift horizontally
             GlyphQuad &gq = m_render_attrs.m_quads.at(i);
-            gq.left += adjustment;
-            gq.right += adjustment;
+            gq.m_left += adjustment;
+            gq.m_right += adjustment;
         }
     }
 
@@ -151,10 +153,10 @@ void Node::populateRenderInfo(render::glyph::GlyphLoader &glyph_loader) {
     }
 
     for (GlyphQuad &gq: m_render_attrs.m_quads) {
-        gq.left += offset_x;
-        gq.top += offset_y;
-        gq.right += offset_x;
-        gq.bottom += offset_y;
+        gq.m_left += offset_x;
+        gq.m_top += offset_y;
+        gq.m_right += offset_x;
+        gq.m_bottom += offset_y;
     }
 }
 

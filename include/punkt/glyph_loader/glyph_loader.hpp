@@ -2,24 +2,13 @@
 
 #include <vector>
 #include <string>
-#include <cstdint>
 #include <unordered_map>
 #include <stdexcept>
 
-namespace render::glyph {
-#pragma pack(push, 1)
-struct Pixel {
-    uint8_t r, g, b, a;
-
-    explicit Pixel();
-
-    Pixel(uint8_t r, uint8_t g, uint8_t b, uint8_t a);
-};
-#pragma pack(pop)
-
+namespace punkt::render::glyph {
 struct GlyphCharInfo {
-    char32_t c;
-    size_t font_size;
+    char32_t c{};
+    size_t font_size{};
 
     bool operator==(const GlyphCharInfo &) const;
 };
@@ -29,11 +18,11 @@ struct GlyphCharInfoHasher {
 };
 
 struct Glyph {
-    std::vector<Pixel> m_texture;
+    std::vector<uint8_t> m_texture;
     size_t m_width;
     size_t m_height;
 
-    Glyph(std::vector<Pixel> texture, size_t width, size_t height);
+    Glyph(std::vector<uint8_t> texture, size_t width, size_t height);
 };
 
 class GlyphLoader {

@@ -2,6 +2,13 @@
 
 #include "punkt/int_types.hpp"
 
+#include <string_view>
+
+// TODO default shape should eventually be ellipse when supported
+constexpr std::string_view default_shape = "box";
+
+constexpr int expected_edge_line_length = 4;
+
 constexpr auto KWD_NODE = "node";
 constexpr auto KWD_EDGE = "edge";
 constexpr auto KWD_DIGRAPH = "digraph";

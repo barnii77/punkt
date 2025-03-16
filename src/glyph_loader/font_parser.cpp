@@ -10,7 +10,7 @@
 #include <string>
 #include <iterator>
 
-using namespace render::glyph;
+using namespace punkt::render::glyph;
 
 GlyphLoader::GlyphLoader() = default;
 

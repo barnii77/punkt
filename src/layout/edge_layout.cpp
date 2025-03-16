@@ -1,4 +1,5 @@
 #include "punkt/dot.hpp"
+#include "punkt/dot_constants.hpp"
 #include "punkt/int_types.hpp"
 
 #include <vector>
@@ -73,6 +74,7 @@ void Digraph::computeEdgeLayout() {
                 float x = dx;
                 for (auto e: edges) {
                     Edge &edge = e;
+                    edge.m_render_attrs.m_trajectory.reserve(expected_edge_line_length);
                     const auto x_pixel = node.m_render_attrs.m_x + static_cast<size_t>(x);
 
                     // depending on whether we are doing upward pass (i.e. handling upward or downward edges), we need

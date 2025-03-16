@@ -1,5 +1,4 @@
 #include "punkt/dot.hpp"
-
 #include "punkt/int_types.hpp"
 
 using namespace punkt;

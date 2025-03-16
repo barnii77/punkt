@@ -8,7 +8,7 @@
 using namespace punkt;
 
 static void emitRect(std::stringstream &ss, const GlyphQuad &gq) {
-    ss << "(" << gq.left << ", " << gq.top << ", " << gq.right << ", " << gq.bottom << ")\n";
+    ss << "(" << gq.m_left << ", " << gq.m_top << ", " << gq.m_right << ", " << gq.m_bottom << ")\n";
 }
 
 TEST(preprocessing, NodeLayout) {
@@ -28,7 +28,7 @@ TEST(preprocessing, NodeLayout) {
     std::stringstream ss;
     for (const Node &node: std::views::values(dg.m_nodes)) {
         ss << "Node " << node.m_name;
-        emitRect(ss, GlyphQuad(0, 0, node.m_render_attrs.m_width, node.m_render_attrs.m_height, 0));
+        emitRect(ss, GlyphQuad(0, 0, node.m_render_attrs.m_width, node.m_render_attrs.m_height, render::glyph::GlyphCharInfo(0, 0)));
         for (const GlyphQuad &gq: node.m_render_attrs.m_quads) {
             ss << "Quad";
             emitRect(ss, gq);

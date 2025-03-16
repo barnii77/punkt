@@ -1,6 +1,6 @@
 #include "punkt/glyph_loader/glyph_loader.hpp"
 
-using namespace render::glyph;
+using namespace punkt::render::glyph;
 
 bool GlyphCharInfo::operator==(const GlyphCharInfo &) const = default;
 
@@ -17,7 +17,7 @@ const Glyph &GlyphLoader::getGlyph(const char32_t c, const size_t font_size) {
             loadGlyph(c, font_size);
         } else {
             // all black and non-transparent (for testing)
-            Glyph g(std::vector<Pixel>(font_size * font_size * 4), font_size, font_size);
+            Glyph g(std::vector<uint8_t>(font_size * font_size), font_size, font_size);
             m_loaded_glyphs.insert_or_assign(k, std::move(g));
         }
     }

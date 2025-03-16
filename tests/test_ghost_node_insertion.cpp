@@ -9,6 +9,7 @@ using namespace punkt;
 
 TEST(preprocessing, GhostNodeInsertion) {
     // Define a graph with nodes and edges chosen to exercise ghost node insertion:
+    // NOTE THE MANUAL RANK ASSIGNMENT BELOW
     // - Edge A -> B: Both nodes have the same rank (0) so ghost insertion (same-rank case) is required.
     // - Edge C -> D: Ranks 1 -> 3 (difference = 2) so ghost node(s) should be inserted.
     // - Edge E -> F: Ranks 3 -> 2 (difference = -1) so no ghost insertion (adjacent ranks).
