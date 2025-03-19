@@ -64,7 +64,7 @@ struct Node {
 
     Node(std::string_view name, Attrs attrs);
 
-    void populateRenderInfo(render::glyph::GlyphLoader &glyph_loader);
+    void populateRenderInfo(const render::glyph::GlyphLoader &glyph_loader);
 };
 
 struct RankRenderAttrs {

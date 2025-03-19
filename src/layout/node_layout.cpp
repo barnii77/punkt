@@ -37,7 +37,7 @@ GlyphQuad::GlyphQuad(const size_t left, const size_t top, const size_t right, co
     : m_left(left), m_top(top), m_right(right), m_bottom(bottom), m_c(c) {
 }
 
-void Node::populateRenderInfo(render::glyph::GlyphLoader &glyph_loader) {
+void Node::populateRenderInfo(const render::glyph::GlyphLoader &glyph_loader) {
     const std::string_view text = getAttrOrDefault(m_attrs, "label", m_name);
     const size_t font_size = getAttrTransformedCheckedOrDefault(m_attrs, "fontsize", default_font_size,
                                                                 stringViewToSizeT);

@@ -283,3 +283,4 @@ target_sources(tests PRIVATE
         tests/test_node_layout.cpp
         tests/test_graph_layout.cpp
 )
+target_link_libraries(tests PRIVATE glad)

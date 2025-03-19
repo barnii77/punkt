@@ -56,6 +56,28 @@ digraph HugeCyclicGraph {
     26 -> 7;
 }
 )";
+    test_input = R"(
+        digraph OptimalTest {
+            // Declare nodes (order in source is not necessarily preserved, but ranks will be computed)
+            A; B; C;
+            D; E; F;
+            G; H; I;
+            J;
+            // Edges:
+            A -> D;
+            B -> D;
+            C -> E;
+            A -> F;
+            D -> G;
+            E -> G;
+            D -> H;
+            B -> I;
+            F -> I;
+            G -> J;
+            H -> J;
+            F -> G;
+        }
+)";
     const char *font_path = nullptr;
     font_path = "resources/fonts/tinyfont.psf";
     punktRun(test_input, font_path);

@@ -1,5 +1,7 @@
 #include "punkt/glyph_loader/glyph_loader.hpp"
 
+#include <glad/glad.h>
+
 #include <string>
 
 using namespace punkt::render::glyph;
