@@ -118,7 +118,7 @@ void Node::populateRenderInfo(const render::glyph::GlyphLoader &glyph_loader) {
     }
 
     // TODO handle padding for non-rectangular node shapes (ellipse, oval)
-    assert(shape == "box" || shape == "rect" || shape == "none");
+    assert(shape == "none" || shape == "box" || shape == "rect" || shape == "ellipse");
 
     auto border_thickness = static_cast<size_t>(pen_width * static_cast<float>(dpi) / static_cast<float>(DEFAULT_DPI));
     if (shape == "none") {
@@ -138,7 +138,7 @@ void Node::populateRenderInfo(const render::glyph::GlyphLoader &glyph_loader) {
     size_t offset_x = (m_render_attrs.m_width - max_line_width) / 2;
     size_t offset_y = (m_render_attrs.m_height - y) / 2;
 
-    if (shape == "box" || shape == "rect") {
+    if (shape == "box" || shape == "rect" || shape == "ellipse") {
         if (offset_x < min_padding) {
             m_render_attrs.m_width += 2 * (min_padding - offset_x);
             offset_x = min_padding;
@@ -157,7 +157,7 @@ void Node::populateRenderInfo(const render::glyph::GlyphLoader &glyph_loader) {
     }
 }
 
-void Digraph::computeNodeLayouts(render::glyph::GlyphLoader &glyph_loader) {
+void Digraph::computeNodeLayouts(const render::glyph::GlyphLoader &glyph_loader) {
     for (Node &node: std::views::values(m_nodes)) {
         node.populateRenderInfo(glyph_loader);
     }

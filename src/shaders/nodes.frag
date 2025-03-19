@@ -11,6 +11,7 @@ out vec4 frag_color;
 
 #define NODE_SHAPE_NONE 0u  // default behavior -> handled by default case
 #define NODE_SHAPE_BOX 1u
+#define NODE_SHAPE_ELLIPSE 2u
 
 void main() {
     switch (frag_node_shape) {
@@ -20,6 +21,18 @@ void main() {
             float border_dist_y = min(frag_node_coord.y, frag_node_size.y - frag_node_coord.y);
             float border_dist = min(border_dist_x, border_dist_y);
             if (border_dist <= frag_border_thickness) {
+                frag_color = frag_border_color;
+            }
+            break;
+        case NODE_SHAPE_ELLIPSE:
+            vec2 radii = frag_node_size / 2.0f;
+            vec2 coords_norm = frag_node_coord - radii;
+            vec2 border_intersection = radii * normalize(coords_norm / radii);
+            vec2 center = vec2(0.0f, 0.0f);
+            float intersection_center_dist = distance(border_intersection, center);
+            float coords_center_dist = distance(coords_norm, center);
+            float dist = intersection_center_dist - coords_center_dist;
+            if (0.0f <= dist && dist <= frag_border_thickness) {
                 frag_color = frag_border_color;
             }
             break;

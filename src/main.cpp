@@ -59,7 +59,8 @@ digraph HugeCyclicGraph {
     test_input = R"(
         digraph OptimalTest {
             // Declare nodes (order in source is not necessarily preserved, but ranks will be computed)
-            A; B; C;
+            node [shape=ellipse];
+            AXYZ; B; C;
             D; E; F;
             G; H; I;
             J;
@@ -101,7 +102,6 @@ digraph HugeCyclicGraph {
 // TODO handle dashed and dotted edges
 // TODO handle DPI properly, currently, 1 dot = 1 pixel, but that's simply not true
 // TODO handle font loading manually - write a minimal TTF parser and renderer
-// TODO handle more shapes for nodes
 // TODO make sure this builds using all major build systems (make, ninja, visual studio msbuild)
 // TODO maybe handle xlabels on edges eventually (external label, i.e. the edge goes through the left edge of the
 // TODO maybe handle color gradients on edges eventually

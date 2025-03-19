@@ -312,12 +312,15 @@ static GLuint getPackedColorFromAttrs(const punkt::Attrs &attrs, const std::stri
     return (static_cast<GLuint>(r) << 0) | (static_cast<GLuint>(g) << 8) | (static_cast<GLuint>(b) << 16);
 }
 
+// used in the fragment shader for identifying how to draw the border
 static GLuint getNodeShapeId(const punkt::Node &node) {
-    // TODO handle padding for non-rectangular node shapes (ellipse, oval)
+    // TODO handle more shapes
     if (const std::string_view &shape = getAttrOrDefault(node.m_attrs, "shape", default_shape); shape == "none") {
         return 0;
     } else if (shape == "box" || shape == "rect") {
         return 1;
+    } else if (shape == "ellipse") {
+        return 2;
     } else {
         throw punkt::IllegalAttributeException("shape", std::string(shape));
     }
@@ -423,8 +426,17 @@ GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
     GL_CRITICAL_CHECK_ALL_ERRORS();
 }
 
-static double getLineAngle(const std::span<const punkt::Vector2<size_t>> trajectory,
-                           const bool go_backward) {
+// determine whether two points for computing the angle of an arrow are too close together and should preferably not
+// be used. Policy: line must be longer than arrow.
+static bool pointsTooCloseToComputeArrowAngle(const punkt::Vector2<size_t> &a, const punkt::Vector2<size_t> &b,
+                                              const double arrow_size) {
+    const auto dx = static_cast<double>(a.x) - static_cast<double>(b.x);
+    const auto dy = static_cast<double>(a.y) - static_cast<double>(b.y);
+    return dx * dx + dy * dy <= arrow_size * arrow_size;
+}
+
+static double getArrowAngle(const std::span<const punkt::Vector2<size_t>> trajectory, const bool go_backward,
+                            const double arrow_size) {
     const auto &a = go_backward ? trajectory.back() : trajectory.front();
 
     // the next point in the line (either before or after depending on go_backward) may be the same point duplicated
@@ -442,12 +454,17 @@ static double getLineAngle(const std::span<const punkt::Vector2<size_t>> traject
     }
     size_t i;
     for (i = start; i != stop; i += step) {
-        if (const auto &b = trajectory[i]; a != b) {
+        if (const auto &b = trajectory[i]; !pointsTooCloseToComputeArrowAngle(a, b, arrow_size)) {
             break;
         }
     }
     if (i == stop) {
-        return 0.0;
+        // check for exact equivalence: if exactly equal, cannot compute angle -> default to 0. Otherwise, meaning they
+        // are just very close together, use anyway as it's the least bad option.
+        i += step;
+        if (const auto &b = trajectory[i]; a == b) {
+            return 0.0;
+        }
     }
 
     // found other reference point for line
@@ -457,27 +474,28 @@ static double getLineAngle(const std::span<const punkt::Vector2<size_t>> traject
                       static_cast<double>(a.x) - static_cast<double>(b.x));
 }
 
-static punkt::Vector2<double> getPointWithHeight(const std::span<const punkt::Vector2<size_t>> trajectory,
-                                                 const bool get_min, double &orientation) {
+static punkt::Vector2<double> getLineEndPointForArrow(const std::span<const punkt::Vector2<size_t>> trajectory,
+                                                      const bool get_min, double &orientation,
+                                                      const double arrow_size) {
     assert(trajectory.size() == 4);
     if (trajectory.front().y < trajectory.back().y) {
         if (get_min) {
             const auto [x, y] = trajectory.front();
-            orientation = getLineAngle(trajectory, false);
+            orientation = getArrowAngle(trajectory, false, arrow_size);
             return punkt::Vector2(static_cast<double>(x), static_cast<double>(y));
         } else {
             const auto [x, y] = trajectory.back();
-            orientation = getLineAngle(trajectory, true);
+            orientation = getArrowAngle(trajectory, true, arrow_size);
             return punkt::Vector2(static_cast<double>(x), static_cast<double>(y));
         }
     } else {
         if (get_min) {
             const auto [x, y] = trajectory.back();
-            orientation = getLineAngle(trajectory, true);
+            orientation = getArrowAngle(trajectory, true, arrow_size);
             return punkt::Vector2(static_cast<double>(x), static_cast<double>(y));
         } else {
             const auto [x, y] = trajectory.front();
-            orientation = getLineAngle(trajectory, false);
+            orientation = getArrowAngle(trajectory, false, arrow_size);
             return punkt::Vector2(static_cast<double>(x), static_cast<double>(y));
         }
     }
@@ -497,7 +515,7 @@ static void buildArrowTriangles(GLRenderer &renderer, const punkt::Edge &edge, c
 
     double line_orientation, arrow_orientation;
     if (is_upward) {
-        auto top = getPointWithHeight(edge.m_render_attrs.m_trajectory, true, line_orientation);
+        auto top = getLineEndPointForArrow(edge.m_render_attrs.m_trajectory, true, line_orientation, arrow_size);
         // since arrows store their coordinates in double precision instead of size_t (i.e. they are not limited to the
         // normal layout grid that other stuff is limited to position-wise), we have to adjust the x so the arrow is
         // centered inside the grid cell it's at.
@@ -509,7 +527,7 @@ static void buildArrowTriangles(GLRenderer &renderer, const punkt::Edge &edge, c
         points[2] = right;
         arrow_orientation = std::numbers::pi * 0.5;
     } else {
-        auto bottom = getPointWithHeight(edge.m_render_attrs.m_trajectory, false, line_orientation);
+        auto bottom = getLineEndPointForArrow(edge.m_render_attrs.m_trajectory, false, line_orientation, arrow_size);
         bottom.x += 0.5; // for explanation, see ~10 lines above
         const auto left = punkt::Vector2(bottom.x - arrow_size_pix / 2, bottom.y - arrow_size_pix);
         const auto right = punkt::Vector2(bottom.x + arrow_size_pix / 2, bottom.y - arrow_size_pix);

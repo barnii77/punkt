@@ -135,7 +135,7 @@ struct Digraph {
 
     void computeHorizontalOrderings();
 
-    void computeNodeLayouts(render::glyph::GlyphLoader &glyph_loader);
+    void computeNodeLayouts(const render::glyph::GlyphLoader &glyph_loader);
 
     void computeGraphLayout();
 

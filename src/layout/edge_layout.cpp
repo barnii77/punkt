@@ -1,4 +1,5 @@
 #include "punkt/dot.hpp"
+#include "punkt/utils.hpp"
 #include "punkt/dot_constants.hpp"
 #include "punkt/int_types.hpp"
 
@@ -6,6 +7,7 @@
 #include <type_traits>
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <numeric>
 
 using namespace punkt;
@@ -31,13 +33,33 @@ static void emplaceEdgeWithRankDiff(const Digraph &dg, Edge &edge, const Node &n
     }
 }
 
+static float getEllipseHeightAt(const Node &node, float x) {
+    // `a` is horizontal radius, `b` is vertical radius, `x` is x position in a centered cartesian coordinate system
+    const auto a = static_cast<float>(node.m_render_attrs.m_width) / 2.0f;
+    const auto b = static_cast<float>(node.m_render_attrs.m_height) / 2.0f;
+    x -= a; // move x E [0, 2a] to [-a, a]
+    return b * std::sqrt(1.0f - x * x / (a * a));
+}
+
 // TODO implement for different shapes
 static size_t getNodeTopHeightAt(const Node &node, const float x) {
+    if (const std::string_view shape = getAttrOrDefault(node.m_attrs, "shape", default_shape);
+        shape == "ellipse") {
+        return static_cast<size_t>(std::round(
+            static_cast<float>(node.m_render_attrs.m_y) + static_cast<float>(node.m_render_attrs.m_height) / 2.0f -
+            getEllipseHeightAt(node, x)));
+    }
     return node.m_render_attrs.m_y;
 }
 
 // TODO implement for different shapes
 static size_t getNodeBottomHeightAt(const Node &node, const float x) {
+    if (const std::string_view shape = getAttrOrDefault(node.m_attrs, "shape", default_shape);
+        shape == "ellipse") {
+        return static_cast<size_t>(std::round(
+            static_cast<float>(node.m_render_attrs.m_y) + static_cast<float>(node.m_render_attrs.m_height) / 2.0f +
+            getEllipseHeightAt(node, x)));
+    }
     return node.m_render_attrs.m_y + node.m_render_attrs.m_height;
 }
 
