@@ -9,6 +9,8 @@ constexpr std::string_view default_shape = "box";
 
 constexpr int expected_edge_line_length = 4;
 
+constexpr float arrow_scale = 5.0f;
+
 constexpr auto KWD_NODE = "node";
 constexpr auto KWD_EDGE = "edge";
 constexpr auto KWD_DIGRAPH = "digraph";
@@ -18,11 +20,12 @@ constexpr auto KWD_GRAPH = "graph";
 // through CLI args (or maybe not at all) and then never changed.
 
 // decides whether to use median or mean barycenter (constexpr so compiler can do optimization magic)
-constexpr bool BARYCENTER_USE_MEDIAN = false;
+// NOTE: empirically, median seems to work *way* better than mean
+constexpr bool BARYCENTER_USE_MEDIAN = true;
 // all this doesn't benefit from being constexpr because it's just magic numbers anyway
 extern float BARYCENTER_ORDERING_DAMPENING;
 extern float BARYCENTER_MIN_AVERAGE_CHANGE_REQUIRED;
-extern ssize_t BARYCENTER_ORDERING_MAX_ITERS;
+extern ssize_t BARYCENTER_ORDERING_MAX_ITERS_PER_DIRECTION;
 // relative weight of number of edge crossovers compared to sum of x distances between connected nodes.
 // used for scoring node orderings within a rank.
 extern float BUBBLE_ORDERING_CROSSOVER_COUNT_WEIGHT;

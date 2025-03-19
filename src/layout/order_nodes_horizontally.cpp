@@ -1,5 +1,6 @@
 #include "punkt/dot.hpp"
 #include "punkt/dot_constants.hpp"
+#include "punkt/int_types.hpp"
 
 #include <cassert>
 #include <vector>
@@ -27,7 +28,7 @@ using namespace punkt;
 
 static void populateOrderingIndexAtRank(Digraph &dg, const size_t rank) {
     for (size_t x = 0; x < dg.m_per_rank_orderings[rank].size(); x++) {
-        dg.m_per_rank_orderings_index.at(rank).emplace(dg.m_per_rank_orderings[rank][x], x);
+        dg.m_per_rank_orderings_index.at(rank).insert_or_assign(dg.m_per_rank_orderings[rank][x], x);
     }
 }
 
@@ -51,15 +52,26 @@ struct ConnectionMat {
     // boolean array (stores size_t to avoid casting around in the prefix sum)
     std::vector<size_t> m_data;
     size_t m_w{}, m_h{};
+    bool m_is_inactive{};
 
     void populate(const Digraph &dg, size_t rank);
 
+    [[nodiscard]] ssize_t getRowLayoutPadding() const;
+
     [[nodiscard]] size_t getSumDX() const;
+
+    [[nodiscard]] size_t getSumDXAt(size_t offset, ssize_t row_pixel_padding, bool is_column_sum) const;
+
+    void swapNodes(size_t a, size_t b, bool is_column_swap);
 };
 
 struct IntersectionMat {
     std::vector<size_t> m_data;
     size_t m_w{}, m_h{};
+    // flag set for assertions when the m_data vector is re-used for intermediate results required for updating the
+    // total intersection count. Since the intersection_mat is only needed for computing the initial intersection count,
+    // this is safe to do, however, I want to save myself potential future headaches and invalidate it explicitly.
+    bool m_is_invalidated{};
 
     void populate(const ConnectionMat &connection_mat);
 
@@ -85,6 +97,8 @@ void ConnectionMat::populate(const Digraph &dg, const size_t rank) {
                     const size_t source_idx = dg.m_per_rank_orderings_index.at(rank).at(edge.m_source);
                     const size_t dest_idx = dg.m_per_rank_orderings_index.at(rank + 1).at(edge.m_dest);
                     assert(source_idx < h && dest_idx < w);
+                    // TODO make this `+= 1` instead of `= 1` to make this account for multiple edges between two nodes
+                    // TODO making this `+= 1` will require changes elsewhere
                     m_data.at(source_idx * w + dest_idx) = 1;
                 }
             }
@@ -92,26 +106,72 @@ void ConnectionMat::populate(const Digraph &dg, const size_t rank) {
     }
 }
 
-// computes the sum of all x distances between connected node pairs
-size_t ConnectionMat::getSumDX() const {
-    size_t out = 0;
+size_t ConnectionMat::getSumDXAt(const size_t offset, ssize_t row_pixel_padding, const bool is_column_sum) const {
+    const auto signed_offset = static_cast<ssize_t>(offset);
+    size_t limit, offset_stride, i_stride;
+    if (is_column_sum) {
+        limit = m_h;
+        offset_stride = 1;
+        i_stride = m_w;
+    } else {
+        limit = m_w;
+        offset_stride = m_w;
+        i_stride = 1;
+    }
+    if (is_column_sum) {
+        row_pixel_padding = -row_pixel_padding;
+    }
 
+    size_t out = 0;
+    for (ssize_t i = 0; i < limit; i++) {
+        const ssize_t dx = std::abs(signed_offset - i - row_pixel_padding);
+        out += dx * static_cast<ssize_t>(m_data.at(signed_offset * offset_stride + i * i_stride));
+    }
+    return out;
+}
+
+static ssize_t getRowLayoutPaddingForRanks(const size_t node_count_current_rank, const size_t node_count_next_rank) {
     // padding accounts for the fact nodes will be centered. E.g. if there is 1 node in rank 0 and 3 nodes in rank 1,
     // then node 0 in rank 0 will actually be aligned with node 1 in rank 1, meaning dist_r0n0_r1n1 = 0 and
     // dist_r0n0_r1n{0|2} = 1. Graphically, padding is a heuristic for how far rank `rank + 1` will be right shifted
     // compared to rank `rank` for centering purposes.
-    const ssize_t padding = (static_cast<ssize_t>(m_h) - static_cast<ssize_t>(m_w)) / 2;
+    return (static_cast<ssize_t>(node_count_current_rank) - static_cast<ssize_t>(node_count_next_rank)) / 2;
+}
 
+ssize_t ConnectionMat::getRowLayoutPadding() const {
+    return getRowLayoutPaddingForRanks(m_h, m_w);
+}
+
+
+// computes the sum of all x distances between connected node pairs
+size_t ConnectionMat::getSumDX() const {
+    size_t out = 0;
+    const ssize_t padding = getRowLayoutPadding();
     for (ssize_t r = 0; r < m_h; r++) {
-        for (ssize_t c = 0; c < m_w; c++) {
-            if (m_data.at(r * m_w + c) == 1) {
-                ssize_t dx = std::abs(r - c - padding);
-                out += dx;
-            }
-        }
+        out += getSumDXAt(r, padding, false);
     }
-
     return out;
+}
+
+static void swapArrays(size_t *a, size_t *b, const size_t n, const ssize_t stride) {
+    for (size_t i = 0, offset = 0; i < n; i++, offset += stride) {
+        std::swap(a[offset], b[offset]);
+    }
+}
+
+void ConnectionMat::swapNodes(const size_t a, const size_t b, const bool is_column_swap) {
+    size_t outer_stride, inner_stride, n;
+    if (is_column_swap) {
+        outer_stride = 1;
+        inner_stride = m_w;
+        n = m_h;
+    } else {
+        outer_stride = m_w;
+        inner_stride = 1;
+        n = m_w;
+    }
+    swapArrays(m_data.data() + a * outer_stride, m_data.data() + b * outer_stride, n,
+               static_cast<ssize_t>(inner_stride));
 }
 
 static size_t reduceSum(const size_t *in, const size_t stride, const size_t n) {
@@ -180,6 +240,7 @@ static void prefixSum(const size_t *in, size_t *out, const ssize_t stride, const
 
 // why is this not the constructor? See ConnectionMat::populate
 void IntersectionMat::populate(const ConnectionMat &connection_mat) {
+    m_is_invalidated = false;
     // resize to size of connection_mat
     const size_t size = connection_mat.m_w * connection_mat.m_h;
     m_data.clear();
@@ -203,38 +264,124 @@ void IntersectionMat::populate(const ConnectionMat &connection_mat) {
 }
 
 size_t IntersectionMat::getTotalIntersections() const {
+    assert(!m_is_invalidated);
     return std::accumulate(m_data.begin(), m_data.end(), 0ull);
 }
 
-// we want to reuse the underlying allocated memory (these vars are cleared every time they are used, this is safe)
-static ConnectionMat connection_mat;
-static IntersectionMat intersection_mat;
+// we want to reuse the underlying allocated memory (these vars are cleared every time they are used, this is safe).
+// Also, we have 2 because one is for upward and one for downward connections
+static ConnectionMat g_connection_mats[2]{};
+static IntersectionMat g_intersection_mats[2]{};
+// TODO I should refactor this to use local variables and references instead of globals
+static size_t g_n_intersections_pr[2]{};
+static size_t g_sum_dx_pr[2]{};
 
 // a bit of a weird helper function (computes two values used for rating jointly)
-static void getNumIntersectionsAndSumDX(const Digraph &dg, const size_t rank, size_t &n_intersections, size_t &sum_dx) {
-    // TODO one could eventually implement a reuse mechanism where not all of connection_mat and intersection_mat are
-    // recomputed, instead recomputing only parts
-    connection_mat.populate(dg, rank);
-    sum_dx = connection_mat.getSumDX();
-    intersection_mat.populate(connection_mat);
-    n_intersections = intersection_mat.getTotalIntersections();
+static void computeNumIntersectionsAndSumDX(const Digraph &dg, const size_t rank, const bool is_downward) {
+    const auto i = static_cast<size_t>(is_downward);
+    g_connection_mats[i].populate(dg, rank);
+    g_sum_dx_pr[i] += g_connection_mats[i].getSumDX();
+    g_intersection_mats[i].populate(g_connection_mats[i]);
+    g_n_intersections_pr[i] += g_intersection_mats[i].getTotalIntersections();
+}
+
+static float getWeightedScore(const size_t sum_dx, const size_t n_intersections) {
+    return BUBBLE_ORDERING_DX_WEIGHT * static_cast<float>(sum_dx) +
+           BUBBLE_ORDERING_CROSSOVER_COUNT_WEIGHT * static_cast<float>(n_intersections);
 }
 
 // computes rank ordering scores between `rank` and `rank + 1`
-static float getPartialRankOrderingScore(const Digraph &dg, const size_t rank) {
+static float getPartialRankOrderingScore(const Digraph &dg, const size_t rank, const bool is_downward) {
     assert(rank < dg.m_per_rank_orderings.size() - 1);
-    size_t sum_dx, n_intersections;
-    getNumIntersectionsAndSumDX(dg, rank, n_intersections, sum_dx);
-    return BUBBLE_ORDERING_DX_WEIGHT * static_cast<float>(sum_dx) +
-           BUBBLE_ORDERING_CROSSOVER_COUNT_WEIGHT * static_cast<float>(n_intersections);
+    const auto i = static_cast<size_t>(is_downward);
+    computeNumIntersectionsAndSumDX(dg, rank, is_downward);
+    return getWeightedScore(g_sum_dx_pr[i], g_n_intersections_pr[i]);
 }
 
 // computes a score (WARNING: smaller is better!) which ranks how good the ordering at rank `rank` is based on
 // intersections and connected node distances and takes into account the ranks `rank - 1`, `rank` and `rank + 1`.
 static float getRankOrderingScore(const Digraph &dg, const size_t rank) {
     assert(rank < dg.m_per_rank_orderings.size());
-    return (rank == 0 ? 0.0f : getPartialRankOrderingScore(dg, rank - 1)) +
-           (rank == dg.m_per_rank_orderings.size() - 1 ? 0.0f : getPartialRankOrderingScore(dg, rank));
+    g_connection_mats[0].m_is_inactive = rank == 0;
+    g_connection_mats[1].m_is_inactive = rank == dg.m_per_rank_orderings.size();
+    for (size_t i = 0; i < 2; i++) {
+        g_sum_dx_pr[i] = 0;
+        g_n_intersections_pr[i] = 0;
+    }
+    return (rank == 0 ? 0.0f : getPartialRankOrderingScore(dg, rank - 1, false)) +
+           (rank == dg.m_per_rank_orderings.size() - 1 ? 0.0f : getPartialRankOrderingScore(dg, rank, true));
+}
+
+static size_t dotProduct(const size_t *a, const size_t *b, const ssize_t stride, const size_t n) {
+    size_t out = 0;
+    for (size_t i = 0; i < n; i++) {
+        const size_t offset = i * stride;
+        out += a[offset] * b[offset];
+    }
+    return out;
+}
+
+static size_t computeIntersectionsAB(const ConnectionMat &connection_mat, IntersectionMat &intersection_mat,
+                                     const size_t idx_a, const size_t idx_b, const bool is_downward) {
+    intersection_mat.m_is_invalidated = true;
+    size_t inner_stride, outer_stride, n;
+    if (is_downward) {
+        inner_stride = 1;
+        outer_stride = connection_mat.m_w;
+        n = connection_mat.m_w;
+    } else {
+        inner_stride = connection_mat.m_w;
+        outer_stride = 1;
+        n = connection_mat.m_h;
+    }
+    // use intersection_mat.m_data as a temporary buffer (it is reset once it's needed again)
+    prefixSum(connection_mat.m_data.data() + outer_stride * idx_b,
+              intersection_mat.m_data.data(), static_cast<ssize_t>(inner_stride), n);
+    const size_t n_ab_intersections = dotProduct(connection_mat.m_data.data() + outer_stride * idx_a,
+                                                 intersection_mat.m_data.data(),
+                                                 static_cast<ssize_t>(inner_stride), n);
+    return n_ab_intersections;
+}
+
+static float updateRankOrderingScoreAfterSwap(const size_t idx_a, const size_t idx_b) {
+    for (size_t i = 0; i < 2; i++) {
+        ConnectionMat &connection_mat = g_connection_mats[i];
+        if (connection_mat.m_is_inactive) {
+            continue;
+        }
+        IntersectionMat &intersection_mat = g_intersection_mats[i];
+        // get the partial score before swap
+        const ssize_t padding = connection_mat.getRowLayoutPadding();
+        const size_t orig_sdx_a = connection_mat.getSumDXAt(idx_a, padding, i == 0);
+        const size_t orig_sdx_b = connection_mat.getSumDXAt(idx_b, padding, i == 0);
+        const size_t orig_intersections =
+                computeIntersectionsAB(connection_mat, intersection_mat, idx_a, idx_b, i == 1);
+
+        // get the partial score after swap (for updating the total score)
+        connection_mat.swapNodes(idx_a, idx_b, i == 0);
+        const size_t new_sdx_a = connection_mat.getSumDXAt(idx_a, padding, i == 0);
+        const size_t new_sdx_b = connection_mat.getSumDXAt(idx_b, padding, i == 0);
+
+        g_sum_dx_pr[i] += static_cast<ssize_t>(new_sdx_a + new_sdx_b) - static_cast<ssize_t>(orig_sdx_a + orig_sdx_b);
+        const size_t new_intersections =
+                computeIntersectionsAB(connection_mat, intersection_mat, idx_a, idx_b, i == 1);
+        g_n_intersections_pr[i] += static_cast<ssize_t>(new_intersections) - static_cast<ssize_t>(orig_intersections);
+    }
+
+    return getWeightedScore(g_sum_dx_pr[0], g_n_intersections_pr[0]) +
+           getWeightedScore(g_sum_dx_pr[1], g_n_intersections_pr[1]);
+    // return getRankOrderingScore(dg, rank);
+}
+
+static void revertToPreSwapState(const size_t pre_swap_n_intersections_pr[2], const size_t pre_swap_sum_dx_pr[2],
+                                 const size_t idx_a, const size_t idx_b) {
+    for (size_t i = 0; i < 2; i++) {
+        g_n_intersections_pr[i] = pre_swap_n_intersections_pr[i];
+        g_sum_dx_pr[i] = pre_swap_sum_dx_pr[i];
+        if (ConnectionMat &connection_mat = g_connection_mats[i]; !connection_mat.m_is_inactive) {
+            connection_mat.swapNodes(idx_a, idx_b, i == 0);
+        }
+    }
 }
 
 void Digraph::swapNodesOnRank(const std::string_view a, const std::string_view b) {
@@ -266,6 +413,7 @@ static void barycenterSweep(Digraph &dg, const bool is_downward_sweep, bool &imp
     }
 
     for (ssize_t rank = start; rank != end; rank += rank_step) {
+        ConnectionMat &connection_mat = g_connection_mats[static_cast<size_t>(is_downward_sweep)];
         connection_mat.populate(dg, rank - static_cast<size_t>(is_downward_sweep));
 
         size_t n_barycenters = connection_mat.m_h, inner_dim = connection_mat.m_w,
@@ -331,24 +479,10 @@ static void barycenterSweep(Digraph &dg, const bool is_downward_sweep, bool &imp
         for (const size_t idx: rearrangement_order) {
             rearranged_ordering.emplace_back(ordering.at(idx));
         }
-        // TODO revert to old medianIndex/meanIndex mechanism if this works (it currently doesn't)
-        for (size_t i = 0; i < n_barycenters; i++) {
-            const auto &node_name = dg.m_per_rank_orderings.at(rank).at(i);
-            auto &node = dg.m_nodes.at(node_name);
-            node.m_render_attrs.m_barycenter_x = static_cast<float>(i);
-        }
 
-        // const float old_score = getRankOrderingScore(dg, rank);
         std::swap(ordering, rearranged_ordering);
         populateOrderingIndexAtRank(dg, rank);
         improvement_found = true;
-        // if (old_score <= getRankOrderingScore(dg, rank)) {
-        //     // this reordering makes it worse, undo changes
-        //     std::swap(ordering, rearranged_ordering);
-        //     populateOrderingIndexAtRank(dg, rank);
-        // } else {
-        //     improvement_found = true;
-        // }
     }
 }
 
@@ -367,21 +501,19 @@ void Digraph::computeHorizontalOrderings() {
         }
     }
 
-    // TODO barycenter still doesn't converge and just gets stuck... I am probably doing something wrong
-    // run median barycenter iterations of alternating up and down sweeps
-    for (ssize_t barycenter_iter = 0; barycenter_iter < BARYCENTER_ORDERING_MAX_ITERS ||
-                                      BARYCENTER_ORDERING_MAX_ITERS < 0; barycenter_iter++) {
-        bool improvement_found = false;
-        float total_change = 0.0f;
+    // TODO determine whether these loops should be interchanged or not, i.e. whether to do oscillating up/down sweeps
+    // or first N down sweeps followed by N up sweeps.
+    for (ssize_t barycenter_iter = 0; barycenter_iter < BARYCENTER_ORDERING_MAX_ITERS_PER_DIRECTION ||
+                                      BARYCENTER_ORDERING_MAX_ITERS_PER_DIRECTION < 0; barycenter_iter++) {
         for (const bool is_downward_sweep: {false, true}) {
+            bool improvement_found = false;
+            float total_change = 0.0f;
             barycenterSweep(*this, is_downward_sweep, improvement_found, total_change);
-        }
-        // TODO remove this
-        total_change = 0.0f;
-        if (const float average_change = total_change / static_cast<float>(m_nodes.size());
-            !improvement_found && average_change < BARYCENTER_MIN_AVERAGE_CHANGE_REQUIRED *
-            BARYCENTER_ORDERING_DAMPENING) {
-            break;
+            if (const float average_change = total_change / static_cast<float>(m_nodes.size());
+                !improvement_found && average_change < BARYCENTER_MIN_AVERAGE_CHANGE_REQUIRED *
+                BARYCENTER_ORDERING_DAMPENING) {
+                break;
+            }
         }
     }
 
@@ -399,17 +531,22 @@ void Digraph::computeHorizontalOrderings() {
         // each iteration, we loop over every rank and every node in each rank in order and try to swap it with its
         // neighbour to the right. If that improves the score, we keep the change, otherwise, we discard it.
         for (size_t rank = 0; rank < m_per_rank_orderings.size(); rank++) {
-            for (size_t node_idx = 0; node_idx < m_per_rank_orderings.at(rank).size() - 1; node_idx++) {
-                // attempt swapping node with neighbour
-                swapNodesOnRank(m_per_rank_orderings[rank][node_idx], m_per_rank_orderings[rank][node_idx + 1]);
+            rank_scores[i] = getRankOrderingScore(*this, rank);
 
-                if (const float new_rank_score = getRankOrderingScore(*this, rank);
+            for (size_t node_idx = 0; node_idx < m_per_rank_orderings.at(rank).size() - 1; node_idx++) {
+                // save the previous state so I can efficiently revert
+                const size_t pre_swap_n_intersections_pr[2] = {g_n_intersections_pr[0], g_n_intersections_pr[1]};
+                const size_t pre_swap_sum_dx_pr[2] = {g_sum_dx_pr[0], g_sum_dx_pr[1]};
+
+                // attempt swapping node with neighbour
+                if (const float new_rank_score = updateRankOrderingScoreAfterSwap(node_idx, node_idx + 1);
                     new_rank_score < rank_scores[rank]) {
                     rank_scores[rank] = new_rank_score;
+                    swapNodesOnRank(m_per_rank_orderings[rank][node_idx], m_per_rank_orderings[rank][node_idx + 1]);
                     improvement_found = true;
                 } else {
-                    // revert the change
-                    swapNodesOnRank(m_per_rank_orderings[rank][node_idx], m_per_rank_orderings[rank][node_idx + 1]);
+                    // equivalent to (but more efficient than) updateRankOrderingScoreAfterSwap(node_idx, node_idx + 1)
+                    revertToPreSwapState(pre_swap_n_intersections_pr, pre_swap_sum_dx_pr, node_idx, node_idx + 1);
                 }
             }
         }

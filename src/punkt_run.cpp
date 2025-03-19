@@ -97,6 +97,7 @@ static GLFWwindow *setupGL() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, 4); // 4x MSAA for antialiasing
 
     GLFWwindow *window = glfwCreateWindow(640, 480, "punkt", nullptr, nullptr);
     if (!window) {
@@ -124,6 +125,8 @@ static void terminateGL(GLFWwindow *window) {
 
 // TODO maybe I should only re-render when user input has been received to reduce cpu/gpu time consumption?
 void punktRun(const char *graph_source_raw, const char *font_path_raw) {
+    // TODO the renderer currently seems to be using the psf texture width as the font size for normalizing in the
+    // chars.vert shader. However, it should actually be using the base height?
     GLFWwindow *window = setupGL();
 
     const std::string_view graph_source(graph_source_raw);

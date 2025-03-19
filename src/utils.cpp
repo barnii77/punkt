@@ -4,6 +4,7 @@
 
 #include <numeric>
 #include <charconv>
+#include <string>
 
 using namespace punkt;
 

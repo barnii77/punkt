@@ -11,7 +11,6 @@ out vec4 frag_color;
 
 #define NODE_SHAPE_NONE 0u  // default behavior -> handled by default case
 #define NODE_SHAPE_BOX 1u
-#define ANTIALIASING_RADIUS 1.5f  // lerp's border and fill color in this amount of pixels
 
 void main() {
     switch (frag_node_shape) {
@@ -22,9 +21,6 @@ void main() {
             float border_dist = min(border_dist_x, border_dist_y);
             if (border_dist <= frag_border_thickness) {
                 frag_color = frag_border_color;
-            } else if (border_dist - frag_border_thickness < ANTIALIASING_RADIUS) {
-                float t = (border_dist - frag_border_thickness) / ANTIALIASING_RADIUS;
-                frag_color = frag_color * t + frag_border_color * (1 - t);
             }
             break;
         default:

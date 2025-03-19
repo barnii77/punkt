@@ -3,11 +3,14 @@
 #include "punkt/gl_error.hpp"
 #include "punkt/utils.hpp"
 #include "punkt/dot_constants.hpp"
+#include "punkt/int_types.hpp"
 #include "generated/punkt/shaders/shaders.hpp"
 
 #include <ranges>
 #include <array>
 #include <cassert>
+#include <cmath>
+#include <numbers>
 
 using namespace punkt::render;
 
@@ -43,8 +46,8 @@ NodeQuadInfo::NodeQuadInfo(const GLuint top_left_x, const GLuint top_left_y, con
                            const GLuint border_color, const GLuint shape_id, const GLuint border_thickness,
                            const GLuint width,
                            const GLuint height)
-    : m_top_left_x(top_left_x), m_top_left_y(top_left_y), m_fill_color(fill_color), m_border_color(border_color),
-      m_shape_id(shape_id), m_border_thickness(border_thickness), m_width(width), m_height(height) {
+    : m_top_left_x(top_left_x), m_top_left_y(top_left_y), m_width(width), m_height(height), m_fill_color(fill_color),
+      m_border_color(border_color), m_shape_id(shape_id), m_border_thickness(border_thickness) {
 }
 
 EdgeLinePoints::EdgeLinePoints(const std::span<const Vector2<size_t>> points, const GLuint packed_color,
@@ -52,8 +55,19 @@ EdgeLinePoints::EdgeLinePoints(const std::span<const Vector2<size_t>> points, co
     : m_points{}, m_packed_color(packed_color), m_line_thickness(line_thickness) {
     assert(points.size() >= std::size(m_points));
     for (size_t i = 0; i < std::size(m_points); i++) {
-        const auto &[x, y] = points[i];
+        const auto [x, y] = points[i];
         m_points[i] = Vector2(static_cast<GLuint>(x), static_cast<GLuint>(y));
+    }
+}
+
+
+EdgeArrowTriangle::EdgeArrowTriangle(const std::span<const Vector2<double>> points, const GLuint packed_color,
+                                     const GLuint shape_id)
+    : m_points{}, m_shape_id(shape_id), m_packed_color(packed_color) {
+    assert(points.size() >= 3);
+    for (size_t i = 0; i < 3; i++) {
+        const auto [x, y] = points[i];
+        m_points[i] = Vector2(static_cast<GLfloat>(x), static_cast<GLfloat>(y));
     }
 }
 
@@ -143,6 +157,42 @@ static VAO moveEdgeLinesToBuffer(const std::span<const EdgeLinePoints> edge_line
     GL_CHECK(glEnableVertexAttribArray(5));
     GL_CHECK(glVertexAttribIPointer(5, 1, GL_UNSIGNED_INT,
         static_cast<GLsizei>(sizeof(EdgeLinePoints)), reinterpret_cast<void *>(9 * sizeof(GLuint))));
+
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    return vao;
+}
+
+static VAO moveArrowTrianglesToBuffer(const std::span<const EdgeArrowTriangle> triangles) {
+    GLuint vao, vbo;
+    GL_CHECK(glGenVertexArrays(1, &vao));
+    GL_CHECK(glGenBuffers(1, &vbo));
+    GL_CHECK(glBindVertexArray(vao));
+    GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, vbo));
+
+    GL_CHECK(glBufferData(GL_ARRAY_BUFFER, triangles.size() * sizeof(EdgeArrowTriangle), triangles.data(),
+        GL_STATIC_DRAW));
+
+    GL_CHECK(glEnableVertexAttribArray(0));
+    GL_CHECK(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(EdgeArrowTriangle),
+        static_cast<void *>(nullptr)));
+
+    GL_CHECK(glEnableVertexAttribArray(1));
+    GL_CHECK(glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(EdgeArrowTriangle),
+        reinterpret_cast<void *>(2 * sizeof(GLuint))));
+
+    GL_CHECK(glEnableVertexAttribArray(2));
+    GL_CHECK(glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(EdgeArrowTriangle),
+        reinterpret_cast<void *>(4 * sizeof(GLuint))));
+
+    GL_CHECK(glEnableVertexAttribArray(3));
+    GL_CHECK(glVertexAttribIPointer(3, 1, GL_UNSIGNED_INT, sizeof(EdgeArrowTriangle),
+        reinterpret_cast<void *>(6 * sizeof(GLuint))));
+
+    GL_CHECK(glEnableVertexAttribArray(4));
+    GL_CHECK(glVertexAttribIPointer(4, 1, GL_UNSIGNED_INT, sizeof(EdgeArrowTriangle),
+        reinterpret_cast<void *>(7 * sizeof(GLuint))));
 
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -264,34 +314,13 @@ static GLuint getPackedColorFromAttrs(const punkt::Attrs &attrs, const std::stri
 
 static GLuint getNodeShapeId(const punkt::Node &node) {
     // TODO handle padding for non-rectangular node shapes (ellipse, oval)
-    if (const std::string_view &shape = node.m_attrs.contains("shape") ? node.m_attrs.at("shape") : default_shape;
-        shape == "none") {
+    if (const std::string_view &shape = getAttrOrDefault(node.m_attrs, "shape", default_shape); shape == "none") {
         return 0;
     } else if (shape == "box" || shape == "rect") {
         return 1;
     } else {
         throw punkt::IllegalAttributeException("shape", std::string(shape));
     }
-}
-
-GLuint GLRenderer::getGlyphTexture(const glyph::GlyphCharInfo &gci) {
-    if (m_glyph_textures.contains(gci)) {
-        return m_glyph_textures[gci];
-    }
-    const glyph::Glyph &glyph = m_glyph_loader.getGlyph(gci.c, gci.font_size);
-    GLuint texture;
-    GL_CHECK(glGenTextures(1, &texture));
-    GL_CHECK(glBindTexture(GL_TEXTURE_2D, texture));
-    GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, static_cast<GLsizei>(glyph.m_width),
-        static_cast<GLsizei>(glyph.m_height), 0, GL_RED, GL_UNSIGNED_BYTE, glyph.m_texture.data()));
-    GL_CHECK(glGenerateMipmap(GL_TEXTURE_2D)); // for zooming out
-    GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
-    GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
-    GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
-    GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
-    GL_CHECK(glBindTexture(GL_TEXTURE_2D, 0));
-    m_glyph_textures.insert_or_assign(gci, texture);
-    return texture;
 }
 
 GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
@@ -307,6 +336,13 @@ GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
 
     // background is white
     GL_CHECK(glClearColor(1.0f, 1.0f, 1.0f, 1.0f));
+
+    // enable MSAA for antialiasing
+    GL_CHECK(glEnable(GL_MULTISAMPLE));
+
+    // blending for transparency and because my text rendering depends on it
+    GL_CHECK(glEnable(GL_BLEND));
+    GL_CHECK(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
     // populate m_char_quads, an opengl-friendly quad collection for instanced rendering, and m_node_quads
     for (const Node &node: std::views::values(dg.m_nodes)) {
@@ -335,7 +371,7 @@ GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
             );
         }
 
-        // build edge lines
+        // build edge lines (& arrows)
         for (const Edge &edge: node.m_outgoing) {
             if (edge.m_render_attrs.m_trajectory.empty()) {
                 // some edges may not have a trajectory because they were replaced by multiple ghost edges
@@ -346,21 +382,23 @@ GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
 
             const GLuint edge_color = getPackedColorFromAttrs(edge.m_attrs, "color", "black");
 
-            const float edge_pen_width = edge.m_attrs.contains("penwidth")
-                                             ? stringViewToFloat(edge.m_attrs.at("penwidth"), "penwidth")
-                                             : 1.0f;
+            const float edge_pen_width = getAttrTransformedCheckedOrDefault(
+                edge.m_attrs, "penwidth", 1.0f, stringViewToFloat);
             // TODO handle custom dpi
             constexpr auto dpi = DEFAULT_DPI;
             const auto edge_thickness = static_cast<GLuint>(
                 edge_pen_width * static_cast<float>(dpi) / static_cast<float>(DEFAULT_DPI));
 
             m_edge_line_points.emplace_back(edge.m_render_attrs.m_trajectory, edge_color, edge_thickness);
+
+            buildArrows(edge, edge_color);
         }
     }
 
     // populate node quad opengl buffers with node quads
     m_node_quad_buffer = moveNodeQuadsToBuffer(m_node_quads);
     m_edge_lines_buffer = moveEdgeLinesToBuffer(m_edge_line_points);
+    m_arrow_triangles_buffer = moveArrowTrianglesToBuffer(m_edge_arrow_triangles);
 
     // populate glyph vertex and instance buffers
     for (const auto &[key, qit]: m_char_quads) {
@@ -379,6 +417,172 @@ GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
                                          chars_fragment_shader_code);
     m_edges_shader = createShaderProgram(edges_vertex_shader_code, edges_geometry_shader_code,
                                          edges_fragment_shader_code);
+    m_arrows_shader = createShaderProgram(arrows_vertex_shader_code, arrows_geometry_shader_code,
+                                          arrows_fragment_shader_code);
 
     GL_CRITICAL_CHECK_ALL_ERRORS();
+}
+
+static double getLineAngle(const std::span<const punkt::Vector2<size_t>> trajectory,
+                           const bool go_backward) {
+    const auto &a = go_backward ? trajectory.back() : trajectory.front();
+
+    // the next point in the line (either before or after depending on go_backward) may be the same point duplicated
+    // and therefore not usable for computing the angle of the line. Therefore, we have to search the first one that
+    // is not equal.
+    int start, stop, step;
+    if (go_backward) {
+        start = static_cast<int>(trajectory.size()) - 2;
+        stop = -1;
+        step = -1;
+    } else {
+        start = 1;
+        stop = static_cast<int>(trajectory.size());
+        step = 1;
+    }
+    size_t i;
+    for (i = start; i != stop; i += step) {
+        if (const auto &b = trajectory[i]; a != b) {
+            break;
+        }
+    }
+    if (i == stop) {
+        return 0.0;
+    }
+
+    // found other reference point for line
+    const auto &b = trajectory[i];
+    // a and b are swapped in the Y term (first parameter) because y in my coordinate system is down instead of up
+    return std::atan2(static_cast<double>(b.y) - static_cast<double>(a.y),
+                      static_cast<double>(a.x) - static_cast<double>(b.x));
+}
+
+static punkt::Vector2<double> getPointWithHeight(const std::span<const punkt::Vector2<size_t>> trajectory,
+                                                 const bool get_min, double &orientation) {
+    assert(trajectory.size() == 4);
+    if (trajectory.front().y < trajectory.back().y) {
+        if (get_min) {
+            const auto [x, y] = trajectory.front();
+            orientation = getLineAngle(trajectory, false);
+            return punkt::Vector2(static_cast<double>(x), static_cast<double>(y));
+        } else {
+            const auto [x, y] = trajectory.back();
+            orientation = getLineAngle(trajectory, true);
+            return punkt::Vector2(static_cast<double>(x), static_cast<double>(y));
+        }
+    } else {
+        if (get_min) {
+            const auto [x, y] = trajectory.back();
+            orientation = getLineAngle(trajectory, true);
+            return punkt::Vector2(static_cast<double>(x), static_cast<double>(y));
+        } else {
+            const auto [x, y] = trajectory.front();
+            orientation = getLineAngle(trajectory, false);
+            return punkt::Vector2(static_cast<double>(x), static_cast<double>(y));
+        }
+    }
+}
+
+static void buildArrowTriangles(GLRenderer &renderer, const punkt::Edge &edge, const GLuint edge_color,
+                                const std::string_view arrow_type, const float arrow_size, const bool is_upward) {
+    if (arrow_type == "none") {
+        return;
+    }
+
+    // TODO support more arrow types - for now, every type emits a normal arrow as "fallback"
+    punkt::Vector2<double> points[3]{};
+    // TODO handle custom dpi
+    constexpr auto dpi = DEFAULT_DPI;
+    const auto arrow_size_pix = arrow_size * arrow_scale * static_cast<float>(dpi) / static_cast<float>(DEFAULT_DPI);
+
+    double line_orientation, arrow_orientation;
+    if (is_upward) {
+        auto top = getPointWithHeight(edge.m_render_attrs.m_trajectory, true, line_orientation);
+        // since arrows store their coordinates in double precision instead of size_t (i.e. they are not limited to the
+        // normal layout grid that other stuff is limited to position-wise), we have to adjust the x so the arrow is
+        // centered inside the grid cell it's at.
+        top.x += 0.5;
+        const auto left = punkt::Vector2(top.x - arrow_size_pix / 2, top.y + arrow_size_pix);
+        const auto right = punkt::Vector2(top.x + arrow_size_pix / 2, top.y + arrow_size_pix);
+        points[0] = top;
+        points[1] = left;
+        points[2] = right;
+        arrow_orientation = std::numbers::pi * 0.5;
+    } else {
+        auto bottom = getPointWithHeight(edge.m_render_attrs.m_trajectory, false, line_orientation);
+        bottom.x += 0.5; // for explanation, see ~10 lines above
+        const auto left = punkt::Vector2(bottom.x - arrow_size_pix / 2, bottom.y - arrow_size_pix);
+        const auto right = punkt::Vector2(bottom.x + arrow_size_pix / 2, bottom.y - arrow_size_pix);
+        points[0] = bottom;
+        points[1] = left;
+        points[2] = right;
+        arrow_orientation = std::numbers::pi * 1.5;
+    }
+
+    // rotate the arrow to be aligned with the line
+    const double a = line_orientation - arrow_orientation;
+    const double sin = std::sin(a), cos = std::cos(a);
+    const auto [x_center_i, y_center_i] = points[0];
+    const auto x_center = static_cast<double>(x_center_i), y_center = static_cast<double>(y_center_i);
+    for (int i = 1; i < 3; i++) {
+        auto &p = points[i];
+        const auto [xi, yi] = p;
+        const auto x = static_cast<double>(xi) - x_center, y = static_cast<double>(yi) - y_center;
+        p.x = cos * x + sin * y + x_center;
+        p.y = -sin * x + cos * y + y_center;
+    }
+
+    renderer.m_edge_arrow_triangles.emplace_back(points, edge_color, 1);
+}
+
+void GLRenderer::buildArrows(const Edge &edge, const GLuint edge_color) {
+    const Node &src = m_dg.m_nodes.at(edge.m_source);
+    const Node &dest = m_dg.m_nodes.at(edge.m_dest);
+    const ssize_t rank_diff = static_cast<ssize_t>(dest.m_render_attrs.m_rank)
+                              - static_cast<ssize_t>(src.m_render_attrs.m_rank);
+    assert(rank_diff == -1 || rank_diff == 1);
+
+    // get relevant attrs
+    const std::string_view &arrow_head_type = getAttrOrDefault(edge.m_attrs, "arrowhead", "normal");
+    const std::string_view &arrow_tail_type = getAttrOrDefault(edge.m_attrs, "arrowtail", "normal");
+    const std::string_view &dir = getAttrOrDefault(edge.m_attrs, "dir", "forward");
+    const float arrow_size = getAttrTransformedCheckedOrDefault(edge.m_attrs, "arrowsize", 1.0f, stringViewToFloat);
+
+    const Node *upwards_node{}, *downwards_node{};
+    std::string_view upwards_arrow_type, downwards_arrow_type;
+    bool has_upwards_arrow{}, has_downwards_arrow{};
+    if (rank_diff == -1) {
+        upwards_node = &dest;
+        downwards_node = &src;
+        upwards_arrow_type = arrow_head_type;
+        downwards_arrow_type = arrow_tail_type;
+        if (dir == "forward") {
+            has_upwards_arrow = true;
+        } else if (dir == "backward") {
+            has_downwards_arrow = true;
+        }
+    } else {
+        upwards_node = &src;
+        downwards_node = &dest;
+        upwards_arrow_type = arrow_tail_type;
+        downwards_arrow_type = arrow_head_type;
+        if (dir == "forward") {
+            has_downwards_arrow = true;
+        } else if (dir == "backward") {
+            has_upwards_arrow = true;
+        }
+    }
+    if (dir == "both") {
+        has_downwards_arrow = true;
+        has_upwards_arrow = true;
+    }
+    has_upwards_arrow = has_upwards_arrow && !upwards_node->m_render_attrs.m_is_ghost;
+    has_downwards_arrow = has_downwards_arrow && !downwards_node->m_render_attrs.m_is_ghost;
+
+    if (has_upwards_arrow) {
+        buildArrowTriangles(*this, edge, edge_color, upwards_arrow_type, arrow_size, true);
+    }
+    if (has_downwards_arrow) {
+        buildArrowTriangles(*this, edge, edge_color, downwards_arrow_type, arrow_size, false);
+    }
 }

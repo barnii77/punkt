@@ -1,4 +1,5 @@
 #version 330 core
+#include "common.glsl"
 
 layout (location = 0) in vec2 vertex0;
 layout (location = 1) in vec2 vertex1;
@@ -13,14 +14,6 @@ out VS_OUT {
     float edge_thickness;
 } vs_out;
 
-vec4 unpackColor(uint color) {
-    float r = float((color >> 0) & 0xFFU) / 255.0f;
-    float g = float((color >> 8) & 0xFFU) / 255.0f;
-    float b = float((color >> 16) & 0xFFU) / 255.0f;
-    float a = 1.0f;
-    return vec4(r, g, b, a);
-}
-
 void main() {
     vs_out.vertices[0] = vertex0;
     vs_out.vertices[1] = vertex1;
@@ -29,6 +22,4 @@ void main() {
 
     vs_out.edge_color = unpackColor(edge_color_packed);
     vs_out.edge_thickness = edge_thickness;
-
-    gl_Position = vec4(0.0f, 0.0f, 0.0f, 1.0f);
 }

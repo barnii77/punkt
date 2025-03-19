@@ -5,6 +5,8 @@
 #include <vector>
 #include <type_traits>
 #include <algorithm>
+#include <cassert>
+#include <numeric>
 
 using namespace punkt;
 
@@ -14,6 +16,10 @@ static const Node &getOtherNode(const Digraph &dg, const Edge &e, const std::str
         return dg.m_nodes.at(e.m_dest);
     }
     return src;
+}
+
+static size_t sumOfX(const size_t accum, const Vector2<size_t> &v) {
+    return accum + v.x;
 }
 
 static void emplaceEdgeWithRankDiff(const Digraph &dg, Edge &edge, const Node &node, const int expected_rank_diff,
@@ -63,7 +69,21 @@ void Digraph::computeEdgeLayout() {
                         other_node_a.m_name);
                     const size_t ordering_idx_b = m_per_rank_orderings_index.at(other_node_b.m_render_attrs.m_rank).at(
                         other_node_b.m_name);
-                    return ordering_idx_a < ordering_idx_b;
+                    if (ordering_idx_a < ordering_idx_b) {
+                        return true;
+                    } else if (ordering_idx_a == ordering_idx_b) {
+                        if (!a.m_render_attrs.m_trajectory.empty()) {
+                            assert(a.m_render_attrs.m_trajectory.size() == b.m_render_attrs.m_trajectory.size());
+                            const size_t a_total_x = std::accumulate(a.m_render_attrs.m_trajectory.begin(),
+                                                                     a.m_render_attrs.m_trajectory.end(), 0ull, sumOfX);
+                            const size_t b_total_x = std::accumulate(b.m_render_attrs.m_trajectory.begin(),
+                                                                     b.m_render_attrs.m_trajectory.end(), 0ull, sumOfX);
+                            return a_total_x <= b_total_x;
+                        }
+                        return true;
+                    } else {
+                        return false;
+                    }
                 });
 
                 // dx is the spacing between edges. They are spaced such that there is even distance between all ingoing

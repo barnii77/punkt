@@ -38,19 +38,17 @@ GlyphQuad::GlyphQuad(const size_t left, const size_t top, const size_t right, co
 }
 
 void Node::populateRenderInfo(render::glyph::GlyphLoader &glyph_loader) {
-    const std::string_view text = m_attrs.contains("label") ? m_attrs.at("label") : m_name;
-    const size_t font_size = m_attrs.contains("fontsize")
-                                 ? stringViewToSizeT(m_attrs.at("fontsize"), "fontsize")
-                                 : default_font_size;
-    const TextAlignment ta = m_attrs.contains("labeljust")
-                                 ? textAlignmentFromStr(m_attrs.at("labeljust"))
-                                 : default_label_just;
-    const float margin = m_attrs.contains("margin") ? stringViewToFloat(m_attrs.at("margin"), "margin") : 0.11f;
-    const std::string_view shape = m_attrs.contains("shape") ? m_attrs.at("shape") : default_shape;
-    const float pen_width = m_attrs.contains("penwidth") ? stringViewToFloat(m_attrs.at("penwidth"), "penwidth") : 1.0f;
+    const std::string_view text = getAttrOrDefault(m_attrs, "label", m_name);
+    const size_t font_size = getAttrTransformedCheckedOrDefault(m_attrs, "fontsize", default_font_size,
+                                                                stringViewToSizeT);
+    const TextAlignment ta =
+            getAttrTransformedOrDefault(m_attrs, "labeljust", default_label_just, textAlignmentFromStr);
+    const float margin = getAttrTransformedCheckedOrDefault(m_attrs, "margin", 0.11f, stringViewToFloat);
+    const std::string_view shape = getAttrOrDefault(m_attrs, "shape", default_shape);
+    const float pen_width = getAttrTransformedCheckedOrDefault(m_attrs, "penwidth", 1.0f, stringViewToFloat);
     constexpr size_t dpi = DEFAULT_DPI; // TODO handle custom DPI settings
 
-    if (const std::string_view type = m_attrs.contains("@type") ? m_attrs.at("@type") : ""; type == "ghost") {
+    if (const std::string_view type = getAttrOrDefault(m_attrs, "@type", ""); type == "ghost") {
         assert(m_render_attrs.m_is_ghost);
         m_render_attrs.m_height = 1;
         assert(m_outgoing.size() == 1);
@@ -58,9 +56,8 @@ void Node::populateRenderInfo(render::glyph::GlyphLoader &glyph_loader) {
 
         const Edge &edge_out = m_outgoing.at(0);
         const Edge &edge_in = m_ingoing.at(0);
-        const float edge_pen_width = edge_out.m_attrs.contains("penwidth")
-                                         ? stringViewToFloat(edge_out.m_attrs.at("penwidth"), "penwidth")
-                                         : 1.0f;
+        const float edge_pen_width = getAttrTransformedCheckedOrDefault(edge_out.m_attrs, "penwidth", 1.0f,
+                                                                        stringViewToFloat);
         // TODO handle custom dpi
         const auto edge_thickness = static_cast<size_t>(
             edge_pen_width * static_cast<float>(dpi) / static_cast<float>(DEFAULT_DPI));
@@ -86,7 +83,7 @@ void Node::populateRenderInfo(render::glyph::GlyphLoader &glyph_loader) {
     for (size_t i = 0; i < text.length(); i++) {
         size_t x_prev = x;
         const char c = text.at(i);
-        const render::glyph::Glyph &glyph = glyph_loader.getGlyph(c, font_size);
+        const render::glyph::GlyphMeta glyph = glyph_loader.getGlyphMeta(c, font_size);
         x += glyph.m_width;
         if (glyph.m_width * glyph.m_height > 0) {
             m_render_attrs.m_quads.emplace_back(x_prev, y - font_size, x, y,

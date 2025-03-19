@@ -3,14 +3,14 @@
 
 using namespace punkt;
 
-float BARYCENTER_ORDERING_DAMPENING = 0.5f;
+float BARYCENTER_ORDERING_DAMPENING = 0.6f;
 // currently disabled because it doesn't converge consistently
 float BARYCENTER_MIN_AVERAGE_CHANGE_REQUIRED = 0.1f;
-ssize_t BARYCENTER_ORDERING_MAX_ITERS = 0;
+ssize_t BARYCENTER_ORDERING_MAX_ITERS_PER_DIRECTION = 5;
 
 float BUBBLE_ORDERING_CROSSOVER_COUNT_WEIGHT = 1.0f;
 float BUBBLE_ORDERING_DX_WEIGHT = 1.0f;
-ssize_t BUBBLE_ORDERING_MAX_ITERS = -1;
+ssize_t BUBBLE_ORDERING_MAX_ITERS = 100;
 
 void Digraph::preprocess(render::glyph::GlyphLoader &glyph_loader) {
     if (m_nodes.empty()) {

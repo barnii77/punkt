@@ -18,9 +18,9 @@ TEST(preprocessing, OptimalHorizontalOrdering) {
         digraph OptimalTest {
             // Declare nodes (order in source is not necessarily preserved, but ranks will be computed)
             A; B; C;
-            D; E;
-            F; G; H;
-            I; J;
+            D; E; F;
+            G; H; I;
+            J;
             // Edges:
             A -> D;
             B -> D;

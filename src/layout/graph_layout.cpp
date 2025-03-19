@@ -8,16 +8,14 @@
 
 using namespace punkt;
 
-constexpr size_t default_rank_sep = static_cast<size_t>(static_cast<float>(DEFAULT_DPI) * 0.5f);
-constexpr size_t default_node_sep = static_cast<size_t>(static_cast<float>(DEFAULT_DPI) * 0.25f);
+constexpr auto default_rank_sep = static_cast<size_t>(static_cast<float>(DEFAULT_DPI) * 0.5f);
+constexpr auto default_node_sep = static_cast<size_t>(static_cast<float>(DEFAULT_DPI) * 0.25f);
 
 void Digraph::computeGraphLayout() {
-    m_render_attrs.m_rank_sep = m_attrs.contains("ranksep")
-                                    ? stringViewToSizeT(m_attrs.at("ranksep"), "ranksep")
-                                    : default_rank_sep;
-    m_render_attrs.m_node_sep = m_attrs.contains("nodesep")
-                                    ? stringViewToSizeT(m_attrs.at("nodesep"), "nodesep")
-                                    : default_node_sep;
+    m_render_attrs.m_rank_sep = getAttrTransformedCheckedOrDefault(m_attrs, "ranksep", default_rank_sep,
+                                                                   stringViewToSizeT);
+    m_render_attrs.m_node_sep = getAttrTransformedCheckedOrDefault(m_attrs, "nodesep", default_node_sep,
+                                                                   stringViewToSizeT);
 
     m_render_attrs.m_rank_render_attrs.resize(m_per_rank_orderings.size());
 
