@@ -84,12 +84,12 @@ TEST(parser, SimpleTest) {
     ASSERT_TRUE(dg.m_nodes.contains("C"));
     const Node& nodeC = dg.m_nodes.at("C");
     EXPECT_EQ(nodeC.m_name, "C");
-    EXPECT_TRUE(nodeC.m_attrs.empty());
+    EXPECT_EQ(nodeC.m_attrs, dg.m_default_node_attrs);
 
     ASSERT_TRUE(dg.m_nodes.contains("D"));
     const Node& nodeD = dg.m_nodes.at("D");
     EXPECT_EQ(nodeD.m_name, "D");
-    EXPECT_TRUE(nodeD.m_attrs.empty());
+    EXPECT_EQ(nodeD.m_attrs, dg.m_default_node_attrs);
 
     // Node E: declared explicitly with an override.
     ASSERT_TRUE(dg.m_nodes.contains("E"));
@@ -318,7 +318,7 @@ TEST(parser, ComplexCyclicTest) {
     // Node U: Implicitly created in Edge Chain 2; no attributes.
     ASSERT_TRUE(dg.m_nodes.contains("U"));
     const Node& nodeU = dg.m_nodes.at("U");
-    EXPECT_TRUE(nodeU.m_attrs.empty());
+    EXPECT_EQ(nodeU.m_attrs, dg.m_default_node_attrs);
 
     // Node T: Declared explicitly with overrides; merge with updated defaults.
     ASSERT_TRUE(dg.m_nodes.contains("T"));

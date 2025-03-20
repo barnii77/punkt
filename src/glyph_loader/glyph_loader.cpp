@@ -4,6 +4,7 @@
 #include <glad/glad.h>
 
 #include <cassert>
+#include <cmath>
 #include <span>
 
 using namespace punkt::render::glyph;

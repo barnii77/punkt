@@ -98,9 +98,9 @@ static bool nextTokenIs(const std::span<tokenizer::Token> &tokens, const tokeniz
     return tok.m_type == type && (!value.has_value() || value.value() == tok.m_value);
 }
 
-static void implicitCreateNodeIfNotExists(Digraph &dg, const std::string_view name) {
+static void implicitCreateNodeIfNotExists(Digraph &dg, const std::string_view name, const Attrs &attrs) {
     if (!dg.m_nodes.contains(name)) {
-        dg.m_nodes.insert_or_assign(name, Node(name, {}));
+        dg.m_nodes.insert_or_assign(name, Node(name, attrs));
     }
 }
 
@@ -170,13 +170,13 @@ static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::T
     } else if (nextTokenIs(tokens, tokenizer::Token::Type::arrow)) {
         validateNodeName(a.m_value);
         // handle edge declaration(s)
-        implicitCreateNodeIfNotExists(dg, a.m_value);
+        implicitCreateNodeIfNotExists(dg, a.m_value, dg.m_default_node_attrs);
         std::vector<Edge> new_edges;
 
         do {
             expectAndConsume(tokens, tokenizer::Token::Type::arrow);
             const tokenizer::Token b = expectAndConsume(tokens, tokenizer::Token::Type::string);
-            implicitCreateNodeIfNotExists(dg, b.m_value);
+            implicitCreateNodeIfNotExists(dg, b.m_value, dg.m_default_node_attrs);
             new_edges.emplace_back(a.m_value, b.m_value);
             a = b;
         } while (nextTokenIs(tokens, tokenizer::Token::Type::arrow));

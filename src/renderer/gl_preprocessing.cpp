@@ -326,6 +326,25 @@ static GLuint getNodeShapeId(const punkt::Node &node) {
     }
 }
 
+static void populateRendererCharQuads(const std::vector<punkt::GlyphQuad> &quads, const size_t x, const size_t y,
+                                      const GLuint font_color,
+                                      std::unordered_map<glyph::GlyphCharInfo, CharQuadInstanceTracker,
+                                          glyph::GlyphCharInfoHasher> &out_char_quads) {
+    // build text quads
+    for (const punkt::GlyphQuad &quad: quads) {
+        if (!out_char_quads.contains(quad.m_c)) {
+            out_char_quads.insert_or_assign(
+                quad.m_c, CharQuadInstanceTracker(quad.m_right - quad.m_left, quad.m_bottom - quad.m_top));
+        }
+        CharQuadInstanceTracker &qit = out_char_quads.at(quad.m_c);
+        qit.m_instances.emplace_back(
+            static_cast<GLuint>(x + quad.m_left),
+            static_cast<GLuint>(y + quad.m_top),
+            font_color
+        );
+    }
+}
+
 GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
     : m_dg(dg), m_glyph_loader(glyph_loader), m_zoom(1.0f) {
     GLint viewport[4]{};
@@ -349,7 +368,9 @@ GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
 
     // populate m_char_quads, an opengl-friendly quad collection for instanced rendering, and m_node_quads
     for (const Node &node: std::views::values(dg.m_nodes)) {
-        const GLuint font_color = getPackedColorFromAttrs(node.m_attrs, "fontcolor", "black");
+        constexpr std::string_view font_color_attr = "fontcolor";
+        constexpr std::string_view default_font_color = "black";
+        GLuint font_color = getPackedColorFromAttrs(node.m_attrs, font_color_attr, default_font_color);
         const GLuint fill_color = getPackedColorFromAttrs(node.m_attrs, "fillcolor", "white");
         const GLuint border_color = getPackedColorFromAttrs(node.m_attrs, "color", "black");
 
@@ -360,19 +381,8 @@ GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
                                   static_cast<GLuint>(node.m_render_attrs.m_width),
                                   static_cast<GLuint>(node.m_render_attrs.m_height));
 
-        // build text quads
-        for (const GlyphQuad &quad: node.m_render_attrs.m_quads) {
-            if (!m_char_quads.contains(quad.m_c)) {
-                m_char_quads.insert_or_assign(
-                    quad.m_c, CharQuadInstanceTracker(quad.m_right - quad.m_left, quad.m_bottom - quad.m_top));
-            }
-            CharQuadInstanceTracker &qit = m_char_quads.at(quad.m_c);
-            qit.m_instances.emplace_back(
-                static_cast<GLuint>(node.m_render_attrs.m_x + quad.m_left),
-                static_cast<GLuint>(node.m_render_attrs.m_y + quad.m_top),
-                font_color
-            );
-        }
+        populateRendererCharQuads(node.m_render_attrs.m_quads, node.m_render_attrs.m_x, node.m_render_attrs.m_y,
+                                  font_color, m_char_quads);
 
         // build edge lines (& arrows)
         for (const Edge &edge: node.m_outgoing) {
@@ -395,6 +405,14 @@ GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
             m_edge_line_points.emplace_back(edge.m_render_attrs.m_trajectory, edge_color, edge_thickness);
 
             buildArrows(edge, edge_color);
+
+            font_color = getPackedColorFromAttrs(edge.m_attrs, font_color_attr, default_font_color);
+            for (const std::vector<GlyphQuad> *quads: {
+                     &edge.m_render_attrs.m_label_quads, &edge.m_render_attrs.m_head_label_quads,
+                     &edge.m_render_attrs.m_tail_label_quads
+                 }) {
+                populateRendererCharQuads(*quads, 0, 0, font_color, m_char_quads);
+            }
         }
     }
 

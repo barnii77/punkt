@@ -5,28 +5,40 @@ set(CMAKE_CXX_STANDARD 20)
 
 function(enable_asan)
     if (MSVC)
-        add_compile_options(/fsanitize=address)
+        set(asan_option "/fsanitize=address")
     else ()
-        add_compile_options(-fsanitize=address)
+        set(asan_option "-fsanitize=address")
+    endif ()
+
+    include(CheckCXXCompilerFlag)
+    check_cxx_compiler_flag("${asan_option}" has_asan_support)
+
+    if (has_asan_support)
+        add_compile_options("${asan_option}")
+        message(STATUS "Compiling with ASan enabled")
+    else ()
+        message(WARNING "Compiling WITHOUT ASan (ASan is unsupported by the compiler)")
     endif ()
 endfunction()
 
 function(initialize_env)
     if ((CMAKE_BUILD_TYPE STREQUAL "Release") OR (CMAKE_CONFIGURATION STREQUAL "Release"))
-        set(RELEASE_MODE TRUE PARENT_SCOPE)
+        set(release_mode TRUE)
     else ()
-        set(RELEASE_MODE FALSE PARENT_SCOPE)
+        set(release_mode FALSE)
     endif ()
+    set(RELEASE_MODE ${release_mode} PARENT_SCOPE)
 
-    if (${RELEASE_MODE})
+    if (${release_mode})
         # in Release mode, bake font into executable by default
-        set(PUNKT_BAKE_FONT_INTO_EXECUTABLE_DEFAULT ON)
+        set(punkt_bake_font_into_executable_default ON)
     else ()
-        set(PUNKT_BAKE_FONT_INTO_EXECUTABLE_DEFAULT OFF)
+        set(punkt_bake_font_into_executable_default OFF)
         # address sanitizer for debug builds
         enable_asan()
     endif ()
-    option(PUNKT_BAKE_FONT_INTO_EXECUTABLE "If enabled, bakes the raw binary font file content into a static variable at compile time so the executable is standalone" ${PUNKT_BAKE_FONT_INTO_EXECUTABLE_DEFAULT})
+    option(PUNKT_BAKE_FONT_INTO_EXECUTABLE "If enabled, bakes the raw binary font file content into a static variable at compile time so the executable is standalone" ${punkt_bake_font_into_executable_default})
+    option(PUNKT_REMOVE_FPS_COUNTER "If set, removes the FPS counter from the application" OFF)
 endfunction()
 
 function(add_project_subdirectories)
@@ -231,6 +243,8 @@ add_library(punkt
         src/layout/node_layout.cpp
         src/layout/graph_layout.cpp
         src/layout/edge_layout.cpp
+        src/layout/edge_label_layout.cpp
+        src/layout/populate_glyph_quads_with_text.cpp
         src/glyph_loader/glyph_loader.cpp
         src/glyph_loader/font_parser.cpp
         src/glyph_loader/glyph_utils.cpp
@@ -246,6 +260,7 @@ add_library(punkt
         include/punkt/dot_tokenizer.hpp
         include/punkt/utils.hpp
         include/punkt/dot_constants.hpp
+        include/punkt/populate_glyph_quads_with_text.hpp
         include/punkt/gl_renderer.hpp
         include/punkt/gl_error.hpp
         include/punkt/glyph_loader/glyph_loader.hpp
@@ -257,6 +272,9 @@ target_include_directories(punkt PRIVATE ${GENERATED_PARENT_DIR})
 target_link_libraries(punkt PRIVATE glfw)
 target_link_libraries(punkt PRIVATE glad)
 target_compile_definitions(punkt PRIVATE $<$<CONFIG:Release>:PUNKT_RELEASE_BUILD>)
+if (${PUNKT_REMOVE_FPS_COUNTER})
+    target_compile_definitions(punkt PRIVATE PUNKT_REMOVE_FPS_COUNTER)
+endif ()
 
 # codegen
 generate_shader_code_header()

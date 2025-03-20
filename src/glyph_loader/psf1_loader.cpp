@@ -4,6 +4,7 @@
 #include <vector>
 #include <unordered_map>
 #include <cassert>
+#include <cstring>
 
 using namespace punkt::render::glyph;
 

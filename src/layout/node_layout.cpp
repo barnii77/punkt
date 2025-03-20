@@ -2,35 +2,16 @@
 #include "punkt/glyph_loader/glyph_loader.hpp"
 #include "punkt/utils.hpp"
 #include "punkt/dot_constants.hpp"
+#include "punkt/populate_glyph_quads_with_text.hpp"
 
 #include <ranges>
-#include <algorithm>
 #include <cassert>
 #include <cmath>
 
 constexpr size_t default_font_size = 14;
-constexpr float extra_padding_factor = 1.2f;
 constexpr size_t min_padding = 4; // pixels
 
 using namespace punkt;
-
-enum class TextAlignment {
-    left,
-    center,
-    right,
-};
-
-constexpr auto default_label_just = TextAlignment::center;
-
-static TextAlignment textAlignmentFromStr(const std::string_view &s) {
-    if (s == "left") {
-        return TextAlignment::left;
-    } else if (s == "right") {
-        return TextAlignment::right;
-    } else {
-        return TextAlignment::center;
-    }
-}
 
 GlyphQuad::GlyphQuad(const size_t left, const size_t top, const size_t right, const size_t bottom,
                      const render::glyph::GlyphCharInfo c)
@@ -69,53 +50,8 @@ void Node::populateRenderInfo(const render::glyph::GlyphLoader &glyph_loader) {
         return;
     }
 
-    // TODO handle unicode
-    std::vector<size_t> quad_lines;
-    quad_lines.reserve(text.length());
-    m_render_attrs.m_quads.reserve(text.length());
-
-    std::vector<size_t> line_widths;
-    line_widths.reserve(std::ranges::count(text, '\n') + 1);
-
-    // build quads but (0, 0) is top left character for now (should later be bounding box of quad)
-    const auto f_font_size = static_cast<float>(font_size);
-    size_t x = 0, y = font_size, line = 0;
-    for (size_t i = 0; i < text.length(); i++) {
-        size_t x_prev = x;
-        const char c = text.at(i);
-        const render::glyph::GlyphMeta glyph = glyph_loader.getGlyphMeta(c, font_size);
-        x += glyph.m_width;
-        if (glyph.m_width * glyph.m_height > 0) {
-            m_render_attrs.m_quads.emplace_back(x_prev, y - font_size, x, y,
-                                                render::glyph::GlyphCharInfo(c, font_size));
-        }
-        quad_lines.emplace_back(line);
-        if (c == '\n') {
-            line_widths.emplace_back(x);
-            x = 0;
-            y = static_cast<size_t>(static_cast<float>(y) + extra_padding_factor * f_font_size);
-            line += 1;
-        }
-    }
-    line_widths.emplace_back(x);
-
-    const size_t max_line_width = std::ranges::max(line_widths);
-    // apply text alignment (left, center or right)
-    if (ta != TextAlignment::left) {
-        for (size_t i = 0; i < m_render_attrs.m_quads.size(); i++) {
-            const size_t quad_line = quad_lines.at(i);
-            const size_t line_width = line_widths.at(quad_line);
-            size_t adjustment = max_line_width - line_width;
-            if (ta == TextAlignment::center) {
-                adjustment /= 2;
-            }
-
-            // shift horizontally
-            GlyphQuad &gq = m_render_attrs.m_quads.at(i);
-            gq.m_left += adjustment;
-            gq.m_right += adjustment;
-        }
-    }
+    size_t max_line_width, y;
+    populateGlyphQuadsWithText(text, font_size, ta, glyph_loader, m_render_attrs.m_quads, max_line_width, y);
 
     // TODO handle padding for non-rectangular node shapes (ellipse, oval)
     assert(shape == "none" || shape == "box" || shape == "rect" || shape == "ellipse");

@@ -4,8 +4,7 @@
 
 #include <string_view>
 
-// TODO default shape should eventually be ellipse when supported
-constexpr std::string_view default_shape = "box";
+constexpr std::string_view default_shape = "ellipse";
 
 constexpr int expected_edge_line_length = 4;
 

@@ -32,6 +32,39 @@ static std::string_view newGhostNode(Digraph &dg, const size_t rank, std::option
     return ghost_name;
 }
 
+static Attrs getGhostEdgeAttrs(const Attrs &edge_attrs, const size_t edge_num, const size_t n_total_edges) {
+    assert(n_total_edges > 1);
+    Attrs out = edge_attrs;
+
+    // these are not inherited from original edge to ghost edges
+    constexpr std::string_view label = "label";
+    constexpr std::string_view headlabel = "headlabel";
+    constexpr std::string_view taillabel = "taillabel";
+    out.erase(label);
+    out.erase(headlabel);
+    out.erase(taillabel);
+
+    if (edge_num == 0 && edge_attrs.contains(taillabel)) {
+        out.insert_or_assign(taillabel, edge_attrs.at(taillabel));
+    }
+
+    if (edge_num == n_total_edges / 2 && edge_attrs.contains(label)) {
+        if (edge_num * 2 == n_total_edges) {
+            // even number of total edges - middle is at the beginning of ghost edge
+            out.insert_or_assign(taillabel, edge_attrs.at(label));
+        } else {
+            // odd number of total edges - middle is in the middle ghost edge
+            out.insert_or_assign(label, edge_attrs.at(label));
+        }
+    }
+
+    if (edge_num == n_total_edges - 1 && edge_attrs.contains(headlabel)) {
+        out.insert_or_assign(headlabel, edge_attrs.at(headlabel));
+    }
+
+    return out;
+}
+
 // if necessary, decomposes an edge into multiple other edges connecting ghost nodes
 static void decomposeEdgeIfRequired(Digraph &dg, const std::string_view source_name, const std::string_view dest_name,
                                     const size_t edge_idx) {
@@ -72,18 +105,21 @@ static void decomposeEdgeIfRequired(Digraph &dg, const std::string_view source_n
             // source -> ghost
             {
                 Node &source = dg.m_nodes.at(source_name);
-                source.m_outgoing.emplace_back(source.m_name, ghost_name, edge_attrs);
+                source.m_outgoing.emplace_back(source.m_name, ghost_name, getGhostEdgeAttrs(edge_attrs, 0, 2));
             }
             // ghost -> dest
             {
                 const Node &dest = dg.m_nodes.at(dest_name);
-                dg.m_nodes.at(ghost_name).m_outgoing.emplace_back(ghost_name, dest.m_name, edge_attrs);
+                dg.m_nodes.at(ghost_name).m_outgoing.emplace_back(ghost_name, dest.m_name,
+                                                                  getGhostEdgeAttrs(edge_attrs, 1, 2));
             }
         } else {
             const int edge_dir = rank_diff < 0 ? -1 : 1;
+            const size_t n_total_edges = rank_diff < 0 ? -rank_diff : rank_diff;
             std::string_view prev_name = source_name;
+            size_t edge_num = 0;
             for (size_t rank = dg.m_nodes.at(source_name).m_render_attrs.m_rank + edge_dir;
-                 rank != dg.m_nodes.at(dest_name).m_render_attrs.m_rank; rank += edge_dir) {
+                 rank != dg.m_nodes.at(dest_name).m_render_attrs.m_rank; rank += edge_dir, edge_num++) {
                 std::optional<std::string_view> color;
                 // again, isolate edge reference because it's a massive foot gun
                 {
@@ -91,10 +127,13 @@ static void decomposeEdgeIfRequired(Digraph &dg, const std::string_view source_n
                     color = getAttrTransformedOrDefault(edge.m_attrs, "color", std::nullopt, std::optional);
                 }
                 const std::string_view ghost_name = newGhostNode(dg, rank, color);
-                dg.m_nodes.at(prev_name).m_outgoing.emplace_back(prev_name, ghost_name, edge_attrs);
+                dg.m_nodes.at(prev_name).m_outgoing.emplace_back(prev_name, ghost_name,
+                                                                 getGhostEdgeAttrs(
+                                                                     edge_attrs, edge_num, n_total_edges));
                 prev_name = ghost_name;
             }
-            dg.m_nodes.at(prev_name).m_outgoing.emplace_back(prev_name, dest_name, edge_attrs);
+            dg.m_nodes.at(prev_name).m_outgoing.emplace_back(prev_name, dest_name,
+                                                             getGhostEdgeAttrs(edge_attrs, edge_num, n_total_edges));
         }
     }
 }

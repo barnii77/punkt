@@ -14,6 +14,7 @@ out vec4 frag_color;
 #define NODE_SHAPE_ELLIPSE 2u
 
 void main() {
+    frag_color = vec4(0.0f, 0.0f, 0.0f, 0.0f);
     switch (frag_node_shape) {
         case NODE_SHAPE_BOX:
             frag_color = frag_fill_color;
@@ -34,6 +35,8 @@ void main() {
             float dist = intersection_center_dist - coords_center_dist;
             if (0.0f <= dist && dist <= frag_border_thickness) {
                 frag_color = frag_border_color;
+            } else if (0.0f <= dist) {
+                frag_color = frag_fill_color;
             }
             break;
         default:

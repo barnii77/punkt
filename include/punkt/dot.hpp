@@ -30,6 +30,9 @@ struct Vector2 {
 
 struct EdgeRenderAttrs {
     std::vector<Vector2<size_t> > m_trajectory;
+    std::vector<GlyphQuad> m_label_quads;
+    std::vector<GlyphQuad> m_head_label_quads;
+    std::vector<GlyphQuad> m_tail_label_quads;
     bool m_is_visible{};
 
     explicit EdgeRenderAttrs();
@@ -140,6 +143,8 @@ struct Digraph {
     void computeGraphLayout();
 
     void computeEdgeLayout();
+
+    void computeEdgeLabelLayouts(const render::glyph::GlyphLoader &glyph_loader);
 
 private:
     void swapNodesOnRank(std::string_view a, std::string_view b);

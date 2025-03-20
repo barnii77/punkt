@@ -39,6 +39,8 @@ static size_t fps_counter_frame_count = 0;
 
 static void fpsCounterInit() {
     fps_counter_last_time = std::time(nullptr);
+    std::cout << "WARNING: This build contains the debug FPS counter. You can disable it through CMake options."
+            << std::endl;
 }
 
 static void fpsCounterNotifyFrameDone() {
@@ -125,8 +127,6 @@ static void terminateGL(GLFWwindow *window) {
 
 // TODO maybe I should only re-render when user input has been received to reduce cpu/gpu time consumption?
 void punktRun(const char *graph_source_raw, const char *font_path_raw) {
-    // TODO the renderer currently seems to be using the psf texture width as the font size for normalizing in the
-    // chars.vert shader. However, it should actually be using the base height?
     GLFWwindow *window = setupGL();
 
     const std::string_view graph_source(graph_source_raw);
@@ -137,7 +137,9 @@ void punktRun(const char *graph_source_raw, const char *font_path_raw) {
                                                          : punkt::render::glyph::GlyphLoader{};
     dg.preprocess(glyph_loader);
     dg.m_renderer.initialize(dg, glyph_loader);
+#ifndef PUNKT_REMOVE_FPS_COUNTER
     fpsCounterInit();
+#endif
 
     while (!glfwWindowShouldClose(window)) {
         int width, height;
@@ -147,7 +149,7 @@ void punktRun(const char *graph_source_raw, const char *font_path_raw) {
         glfwSwapBuffers(window);
         glfwPollEvents();
         ui_state.frameDone(window, dg);
-#ifndef PUNKT_RELEASE_BUILD
+#ifndef PUNKT_REMOVE_FPS_COUNTER
         fpsCounterNotifyFrameDone();
 #endif
     }

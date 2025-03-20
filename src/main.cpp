@@ -59,7 +59,8 @@ digraph HugeCyclicGraph {
     test_input = R"(
         digraph OptimalTest {
             // Declare nodes (order in source is not necessarily preserved, but ranks will be computed)
-            node [shape=ellipse];
+            node [shape=ellipse, fillcolor=red];
+            edge [headlabel="HI!", label="HO!", taillabel="HA?", fontsize=5];
             AXYZ; B; C;
             D; E; F;
             G; H; I;
@@ -79,6 +80,31 @@ digraph HugeCyclicGraph {
             F -> G;
         }
 )";
+    test_input = R"(
+        digraph GraphLayoutTest {
+            rankdir=TB;
+            ranksep=75;
+            nodesep=50;
+
+            A [label="Node A\nFirst rank", fontsize=12];
+            B [label="Node B\nFirst rank too"];
+            C [label="This is\nNode C\nSecond rank"];
+            D [label="D in\nsecond rank", color=green];
+            E [label="E in third rank"];
+            F [label="F also\nin third rank", fillcolor=red];
+            G [label="G in fourth", shape=ellipse, penwidth=5.0];
+
+            A -> C [label="E1"];
+            A -> D;
+            B -> C [headlabel="E3"];
+            B -> D;
+            C -> E [taillabel="E5", label="E5"];
+            D -> F;
+            E -> G;
+            F -> G;
+            A -> G [headlabel="E42", label="E42", taillabel="E42", fontsize=7];
+        }
+)";
     const char *font_path = nullptr;
     font_path = "resources/fonts/tinyfont.psf";
     punktRun(test_input, font_path);
@@ -86,11 +112,8 @@ digraph HugeCyclicGraph {
 
 ////////////////////// TODOS //////////////////////
 
-// TODO wait, actually, edge labels may be easier than I thought because edges are allowed to clip through edge
-// labels... however, they're not so easy in the sense that I have to modify the way that edge labels are
-// propagated to ghost edges, because I only want the label once, not on every ghost edge
-// TODO handle edge labels (label, headlabel, taillabel). Also add options for putting it either to the right or into
-// the edge line (i.e. either center around the edge label root or just grow to the right)
+// TODO why is the startup time suddenly super long when running on my laptop screen???
+// TODO why the hell does it flicker when I render on my laptop screen but not on my pc screen??????
 // TODO handle spline edges
 // TODO handle subgraphs and clusters
 // TODO I have node order computation kinda working, so now, when I have graph layout computation, I should decide
@@ -104,6 +127,8 @@ digraph HugeCyclicGraph {
 // TODO handle font loading manually - write a minimal TTF parser and renderer
 // TODO make sure this builds using all major build systems (make, ninja, visual studio msbuild)
 // TODO maybe handle xlabels on edges eventually (external label, i.e. the edge goes through the left edge of the
+// TODO handle `labelangle` attribute right after the glyph quads have been populated for an edge relative to the top
+// left glyph. At this point, I can do trigonometry like with the arrows and rotate the text
 // TODO maybe handle color gradients on edges eventually
 // label node instead of the center)
 // TODO maybe I could add drawing on top xD (i.e. you have a separate surface that you draw into in black and that

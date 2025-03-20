@@ -35,4 +35,5 @@ void Digraph::preprocess(render::glyph::GlyphLoader &glyph_loader) {
     computeNodeLayouts(glyph_loader);
     computeGraphLayout();
     computeEdgeLayout();
+    computeEdgeLabelLayouts(glyph_loader);
 }
