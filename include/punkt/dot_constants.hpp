@@ -4,7 +4,7 @@
 
 #include <string_view>
 
-constexpr std::string_view default_shape = "ellipse";
+constexpr std::string_view default_shape = "box";
 
 constexpr int expected_edge_line_length = 4;
 

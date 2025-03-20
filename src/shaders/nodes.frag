@@ -13,6 +13,17 @@ out vec4 frag_color;
 #define NODE_SHAPE_BOX 1u
 #define NODE_SHAPE_ELLIPSE 2u
 
+#define IN_ELLIPSE_ANTIALIASING_INTERPOLATION_START 0.97f
+
+// smoothed out version of the hypothetical boolean "is point p inside of the given ellipse?"
+float isInEllipse(vec2 p, vec2 radii) {
+    vec2 norm = p / radii;
+    float d = dot(norm, norm);
+    float scale = 1.0f / (1.0f - IN_ELLIPSE_ANTIALIASING_INTERPOLATION_START);
+    float x = (d - IN_ELLIPSE_ANTIALIASING_INTERPOLATION_START) * scale;
+    return smoothstep(1.0f, 0.0f, x);
+}
+
 void main() {
     frag_color = vec4(0.0f, 0.0f, 0.0f, 0.0f);
     switch (frag_node_shape) {
@@ -28,16 +39,9 @@ void main() {
         case NODE_SHAPE_ELLIPSE:
             vec2 radii = frag_node_size / 2.0f;
             vec2 coords_norm = frag_node_coord - radii;
-            vec2 border_intersection = radii * normalize(coords_norm / radii);
-            vec2 center = vec2(0.0f, 0.0f);
-            float intersection_center_dist = distance(border_intersection, center);
-            float coords_center_dist = distance(coords_norm, center);
-            float dist = intersection_center_dist - coords_center_dist;
-            if (0.0f <= dist && dist <= frag_border_thickness) {
-                frag_color = frag_border_color;
-            } else if (0.0f <= dist) {
-                frag_color = frag_fill_color;
-            }
+            float in_outer = isInEllipse(coords_norm, radii);
+            float in_inner = isInEllipse(coords_norm, radii - float(frag_border_thickness));
+            frag_color = in_inner * frag_fill_color + (in_outer - in_inner) * frag_border_color;
             break;
         default:
             frag_color = frag_fill_color;

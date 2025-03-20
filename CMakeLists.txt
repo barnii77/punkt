@@ -32,13 +32,15 @@ function(initialize_env)
     if (${release_mode})
         # in Release mode, bake font into executable by default
         set(punkt_bake_font_into_executable_default ON)
+        set(punkt_remove_fps_counter_default ON)
     else ()
         set(punkt_bake_font_into_executable_default OFF)
+        set(punkt_remove_fps_counter_default OFF)
         # address sanitizer for debug builds
         enable_asan()
     endif ()
     option(PUNKT_BAKE_FONT_INTO_EXECUTABLE "If enabled, bakes the raw binary font file content into a static variable at compile time so the executable is standalone" ${punkt_bake_font_into_executable_default})
-    option(PUNKT_REMOVE_FPS_COUNTER "If set, removes the FPS counter from the application" OFF)
+    option(PUNKT_REMOVE_FPS_COUNTER "If set, removes the FPS counter from the application" ${punkt_remove_fps_counter_default})
 endfunction()
 
 function(add_project_subdirectories)
@@ -64,7 +66,7 @@ function(setup_header_generation)
     file(MAKE_DIRECTORY "${generated_dir}/punkt/shaders/")
 endfunction()
 
-function(convert_hex_to_c_array INPUT_HEX OUTPUT_VAR)
+function(convert_hex_to_c_array INPUT_HEX OUTPUT_VAR OUTPUT_VAR_N)
     string(LENGTH "${INPUT_HEX}" hex_len)
     math(EXPR num_bytes "${hex_len} / 2")
     set(formatted_resource "")
@@ -74,34 +76,37 @@ function(convert_hex_to_c_array INPUT_HEX OUTPUT_VAR)
         string(SUBSTRING "${INPUT_HEX}" ${pos} 2 byte)
 
         if (i EQUAL 0)
-            set(formatted_resource "0x${byte}")
+            set(formatted_resource "\\x${byte}")
         else ()
-            set(formatted_resource "${formatted_resource}, 0x${byte}")
+            set(formatted_resource "${formatted_resource}\\x${byte}")
         endif ()
     endforeach ()
 
     set(${OUTPUT_VAR} "${formatted_resource}00" PARENT_SCOPE)
+    math(EXPR num_bytes "${num_bytes} + 1")  # because of the null byte at the end
+    set(${OUTPUT_VAR_N} ${num_bytes} PARENT_SCOPE)
 endfunction()
 
 function(generate_font_data_header)
-    set(GENERATED_FONT_RESOURCES_CONTENT "#pragma once\n\n#include <unordered_map>\n#include <string>\n\nstatic std::unordered_map<std::string_view, std::string> raw_font_data_map = {\n")
+    set(generated_font_resources_content "#pragma once\n\n#include <unordered_map>\n#include <string>\n\nstatic std::unordered_map<std::string_view, std::string> raw_font_data_map = {\n")
 
-    file(GLOB FONT_FILES RELATIVE "${CMAKE_SOURCE_DIR}/resources/fonts/" "${CMAKE_SOURCE_DIR}/resources/fonts/*.*")
-    if (NOT (FONT_FILES STREQUAL ""))
-        message(STATUS "Detected font files (baking them into executable): ${FONT_FILES}")
+    file(GLOB font_files RELATIVE "${CMAKE_SOURCE_DIR}/resources/fonts/" "${CMAKE_SOURCE_DIR}/resources/fonts/*.*")
+    if (NOT (font_files STREQUAL ""))
+        message(STATUS "Detected font files (baking them into executable): ${font_files}")
     endif ()
 
-    foreach (FILE ${FONT_FILES})
-        file(READ "${CMAKE_SOURCE_DIR}/resources/fonts/${FILE}" RAW_RESOURCE_CONTENTS HEX)
-        convert_hex_to_c_array("${RAW_RESOURCE_CONTENTS}" FORMATTED_RESOURCE_CONTENTS)
-        string(APPEND GENERATED_FONT_RESOURCES_CONTENT "    {\"${FILE}\", std::string((char []) {${FORMATTED_RESOURCE_CONTENTS}})},\n")
+    foreach (file ${font_files})
+        set(font_path "resources/fonts/${file}")
+        file(READ "${CMAKE_SOURCE_DIR}/${font_path}" RAW_RESOURCE_CONTENTS HEX)
+        convert_hex_to_c_array("${RAW_RESOURCE_CONTENTS}" formatted_resource_contents formatted_resource_num_bytes)
+        string(APPEND generated_font_resources_content "    {\"${font_path}\", std::string(\"${formatted_resource_contents}\", ${formatted_resource_num_bytes})},\n")
     endforeach ()
 
-    string(APPEND GENERATED_FONT_RESOURCES_CONTENT "};\n")
+    string(APPEND generated_font_resources_content "};\n")
 
     file(GENERATE
             OUTPUT "${GENERATED_DIR}/punkt/glyph_loader/font_resources.hpp"
-            CONTENT "${GENERATED_FONT_RESOURCES_CONTENT}"
+            CONTENT "${generated_font_resources_content}"
     )
 endfunction()
 
@@ -281,6 +286,7 @@ generate_shader_code_header()
 generate_color_map_header()
 if (${PUNKT_BAKE_FONT_INTO_EXECUTABLE})
     generate_font_data_header()
+    target_compile_definitions(punkt PRIVATE PUNKT_BAKE_FONT_INTO_EXECUTABLE)
 endif ()
 
 function(add_dependent_target name file)

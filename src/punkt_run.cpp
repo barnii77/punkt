@@ -126,13 +126,15 @@ static void terminateGL(GLFWwindow *window) {
 }
 
 // TODO maybe I should only re-render when user input has been received to reduce cpu/gpu time consumption?
-void punktRun(const char *graph_source_raw, const char *font_path_raw) {
+void punktRun(const char *graph_source_cstr, const char *font_path_relative_to_project_root_cstr) {
     GLFWwindow *window = setupGL();
 
-    const std::string_view graph_source(graph_source_raw);
-    const std::string_view font_path = font_path_raw ? std::string_view(font_path_raw) : std::string_view();
+    const std::string_view graph_source(graph_source_cstr);
+    const std::string_view font_path = font_path_relative_to_project_root_cstr
+                                           ? std::string_view(font_path_relative_to_project_root_cstr)
+                                           : std::string_view();
     punkt::Digraph dg(graph_source);
-    punkt::render::glyph::GlyphLoader glyph_loader = font_path_raw
+    punkt::render::glyph::GlyphLoader glyph_loader = font_path_relative_to_project_root_cstr
                                                          ? punkt::render::glyph::GlyphLoader{std::string(font_path)}
                                                          : punkt::render::glyph::GlyphLoader{};
     dg.preprocess(glyph_loader);

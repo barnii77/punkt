@@ -112,8 +112,8 @@ digraph HugeCyclicGraph {
 
 ////////////////////// TODOS //////////////////////
 
-// TODO why is the startup time suddenly super long when running on my laptop screen???
-// TODO why the hell does it flicker when I render on my laptop screen but not on my pc screen??????
+// TODO in the last example there are some (i assume size_t truncating?) imperfections where ghost edges just don't
+// match in size and it looks really bad
 // TODO handle spline edges
 // TODO handle subgraphs and clusters
 // TODO I have node order computation kinda working, so now, when I have graph layout computation, I should decide

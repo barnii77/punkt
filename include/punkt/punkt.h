@@ -7,7 +7,7 @@
 #define EXPORT
 #endif
 
-EXPORT void punktRun(const char *graph_source_raw, const char *font_path_raw);
+EXPORT void punktRun(const char *graph_source_cstr, const char *font_path_relative_to_project_root_cstr);
 
 #undef EXPORT
 
