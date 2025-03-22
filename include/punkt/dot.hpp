@@ -96,7 +96,7 @@ struct GraphRenderer {
 
     void renderFrame() const;
 
-    void updateZoom(float factor) const;
+    void updateZoom(double factor, double cursor_x, double cursor_y, double window_width, double window_height) const;
 
     void resetZoom() const;
 

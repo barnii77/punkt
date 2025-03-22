@@ -53,7 +53,7 @@ void Node::populateRenderInfo(const render::glyph::GlyphLoader &glyph_loader) {
     populateGlyphQuadsWithText(text, font_size, ta, glyph_loader, m_render_attrs.m_quads, max_line_width, y);
 
     // TODO handle padding for non-rectangular node shapes (ellipse, oval)
-    assert(shape == "none" || shape == "box" || shape == "rect" || shape == "ellipse");
+    assert(shape == "none" || shape == "box" || shape == "rect" || shape == "ellipse" || shape == "circle");
 
     auto border_thickness = static_cast<size_t>(pen_width * static_cast<float>(dpi) / static_cast<float>(DEFAULT_DPI));
     if (shape == "none") {
@@ -70,10 +70,15 @@ void Node::populateRenderInfo(const render::glyph::GlyphLoader &glyph_loader) {
                               border_thickness_size_adjustment;
     m_render_attrs.m_border_thickness = border_thickness;
 
+    if (shape == "circle") {
+        m_render_attrs.m_width = std::max(m_render_attrs.m_width, m_render_attrs.m_height);
+        m_render_attrs.m_height = m_render_attrs.m_width;
+    }
+
     size_t offset_x = (m_render_attrs.m_width - max_line_width) / 2;
     size_t offset_y = (m_render_attrs.m_height - y) / 2;
 
-    if (shape == "box" || shape == "rect" || shape == "ellipse") {
+    if (shape == "box" || shape == "rect" || shape == "ellipse" || shape == "circle") {
         if (offset_x < min_padding) {
             m_render_attrs.m_width += 2 * (min_padding - offset_x);
             offset_x = min_padding;

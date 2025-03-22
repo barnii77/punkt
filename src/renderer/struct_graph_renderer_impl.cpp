@@ -35,10 +35,10 @@ void GraphRenderer::renderFrame() const {
     glr.renderFrame();
 }
 
-void GraphRenderer::updateZoom(const float factor) const {
+void GraphRenderer::updateZoom(const double factor, const double cursor_x, const double cursor_y, const double window_width, const double window_height) const {
     assertNonNull(m_graph_renderer);
     render::GLRenderer &glr = *static_cast<render::GLRenderer *>(m_graph_renderer);
-    glr.updateZoom(factor);
+    glr.updateZoom(factor, cursor_x, cursor_y, window_width, window_height);
 }
 
 void GraphRenderer::resetZoom() const {

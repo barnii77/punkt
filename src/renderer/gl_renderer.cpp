@@ -10,16 +10,20 @@
 
 using namespace punkt::render;
 
-void GLRenderer::updateZoom(const float factor) {
+void GLRenderer::updateZoom(const double factor, double cursor_x, double cursor_y, const double window_width,
+                            const double window_height) {
     assert(factor > 0.0f);
+    cursor_x -= window_width / 2.0;
+    cursor_y -= window_height / 2.0;
+    m_camera_x += cursor_x / m_zoom;
+    m_camera_y += cursor_y / m_zoom;
     m_zoom *= factor;
-    // const float adjust_factor = (1.0f - 1.0f / factor) / (2.0f * m_zoom);
-    // m_camera_x += static_cast<ssize_t>(adjust_factor * static_cast<float>(m_viewport_w));
-    // m_camera_y += static_cast<ssize_t>(adjust_factor * static_cast<float>(m_viewport_h));
+    m_camera_x -= cursor_x / m_zoom;
+    m_camera_y -= cursor_y / m_zoom;
 }
 
 void GLRenderer::resetZoom() {
-    m_zoom = 1.0f;
+    m_zoom = 1.0;
 }
 
 void GLRenderer::notifyFramebufferSize(const int width, const int height) {
@@ -34,16 +38,16 @@ void GLRenderer::notifyCursorMovement(const double dx, const double dy) {
     m_camera_y -= inv_zoom * dy;
 }
 
-glyph::GlyphCharInfo transformGciForZoom(const glyph::GlyphCharInfo &gci, float zoom) {
+glyph::GlyphCharInfo transformGciForZoom(const glyph::GlyphCharInfo &gci, double zoom) {
     static GLint value = 0;
     if (!value) {
         glGetIntegerv(GL_MAX_TEXTURE_SIZE, &value);
     }
     assert(value > 0);
-    zoom = std::min(zoom, 1024.0f);
+    zoom = std::min(zoom, 1024.0);
     // limit texture size to either max supported texture size or 1024
     const size_t tex_size = std::min(
-        std::min(static_cast<GLint>(static_cast<float>(gci.font_size) * zoom), value - 1),
+        std::min(static_cast<GLint>(static_cast<double>(gci.font_size) * zoom), value - 1),
         1024
     );
     return glyph::GlyphCharInfo(gci.c, tex_size);

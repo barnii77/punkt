@@ -64,7 +64,7 @@ using VAO = GLuint;
 struct GLRenderer {
     const Digraph &m_dg;
     glyph::GlyphLoader &m_glyph_loader;
-    float m_zoom{};
+    double m_zoom{};
     size_t m_viewport_w{}, m_viewport_h{};
     double m_camera_x{}, m_camera_y{};
     std::unordered_map<glyph::GlyphCharInfo, CharQuadInstanceTracker, glyph::GlyphCharInfoHasher> m_char_quads;
@@ -85,7 +85,7 @@ struct GLRenderer {
 
     void renderFrame();
 
-    void updateZoom(float factor);
+    void updateZoom(double factor, double cursor_x, double cursor_y, double window_width, double window_height);
 
     void resetZoom();
 

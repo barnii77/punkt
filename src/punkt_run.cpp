@@ -11,17 +11,23 @@
 #include <iostream>
 
 constexpr double zoom_base = 1.1f;
+constexpr size_t startup_window_width = 640;
+constexpr size_t startup_window_height = 480;
 
 struct PunktUIState {
     // all this stuff is volatile because any callback could change it at any point in time (& compiler is unaware)
-    volatile double m_cursor_x{}, m_cursor_y{}, m_cursor_dx{}, m_cursor_dy{}, m_zoom_update{1.0f};
+    volatile double m_cursor_x{}, m_cursor_y{}, m_cursor_dx{}, m_cursor_dy{}, m_zoom_update{1.0};
+    double m_window_width{static_cast<double>(startup_window_width)};
+    double m_window_height{static_cast<double>(startup_window_height)};
     volatile bool m_reset_zoom{}, m_left_mouse_button_down{}, m_is_first_cursor_action{true};
 
-    void frameDone(GLFWwindow *window, const punkt::Digraph &dg);
+    void frameDone(const punkt::Digraph &dg);
+
+    void notifyWindowSize(int window_width, int window_height);
 };
 
-void PunktUIState::frameDone(GLFWwindow *window, const punkt::Digraph &dg) {
-    dg.m_renderer.updateZoom(static_cast<float>(m_zoom_update));
+void PunktUIState::frameDone(const punkt::Digraph &dg) {
+    dg.m_renderer.updateZoom(m_zoom_update, m_cursor_x, m_cursor_y, m_window_width, m_window_height);
     if (m_reset_zoom) {
         dg.m_renderer.resetZoom();
     }
@@ -32,7 +38,12 @@ void PunktUIState::frameDone(GLFWwindow *window, const punkt::Digraph &dg) {
     m_cursor_dy = 0;
 }
 
-static PunktUIState ui_state;
+void PunktUIState::notifyWindowSize(const int window_width, const int window_height) {
+    m_window_width = window_width;
+    m_window_height = window_height;
+}
+
+static PunktUIState ui_state{};
 
 static size_t fps_counter_last_time;
 static size_t fps_counter_frame_count = 0;
@@ -101,7 +112,7 @@ static GLFWwindow *setupGL() {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_SAMPLES, 4); // 4x MSAA for antialiasing
 
-    GLFWwindow *window = glfwCreateWindow(640, 480, "punkt", nullptr, nullptr);
+    GLFWwindow *window = glfwCreateWindow(startup_window_width, startup_window_height, "punkt", nullptr, nullptr);
     if (!window) {
         glfwTerminate();
         exit(EXIT_FAILURE);
@@ -144,13 +155,20 @@ void punktRun(const char *graph_source_cstr, const char *font_path_relative_to_p
 #endif
 
     while (!glfwWindowShouldClose(window)) {
-        int width, height;
-        glfwGetFramebufferSize(window, &width, &height);
-        dg.m_renderer.notifyFramebufferSize(width, height);
+        int window_width, window_height;
+        glfwGetWindowSize(window, &window_width, &window_height);
+        ui_state.notifyWindowSize(window_width, window_height);
+
+        int framebuffer_width, framebuffer_height;
+        glfwGetFramebufferSize(window, &framebuffer_width, &framebuffer_height);
+        dg.m_renderer.notifyFramebufferSize(framebuffer_width, framebuffer_height);
+
         dg.m_renderer.renderFrame();
         glfwSwapBuffers(window);
+
         glfwPollEvents();
-        ui_state.frameDone(window, dg);
+
+        ui_state.frameDone(dg);
 #ifndef PUNKT_REMOVE_FPS_COUNTER
         fpsCounterNotifyFrameDone();
 #endif

@@ -315,6 +315,7 @@ static GLuint getPackedColorFromAttrs(const punkt::Attrs &attrs, const std::stri
 constexpr GLuint node_shape_none = 0;
 constexpr GLuint node_shape_box = 1;
 constexpr GLuint node_shape_ellipse = 2;
+constexpr GLuint node_shape_circle = node_shape_ellipse; // from shader POV there is no difference
 
 // used in the fragment shader for identifying how to draw the border
 static GLuint getNodeShapeId(const punkt::Node &node) {
@@ -325,6 +326,8 @@ static GLuint getNodeShapeId(const punkt::Node &node) {
         return node_shape_box;
     } else if (shape == "ellipse") {
         return node_shape_ellipse;
+    } else if (shape == "circle") {
+        return node_shape_circle;
     } else {
         throw punkt::IllegalAttributeException("shape", std::string(shape));
     }
@@ -350,7 +353,7 @@ static void populateRendererCharQuads(const std::vector<punkt::GlyphQuad> &quads
 }
 
 GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
-    : m_dg(dg), m_glyph_loader(glyph_loader), m_zoom(1.0f), m_digraph_quad(0, 0, 0, 0, 0, 0, 0, 0) {
+    : m_dg(dg), m_glyph_loader(glyph_loader), m_zoom(1.0), m_digraph_quad(0, 0, 0, 0, 0, 0, 0, 0) {
     GLint viewport[4]{};
     GL_CHECK(glGetIntegerv(GL_VIEWPORT, viewport));
     const GLint vw = viewport[2] - viewport[0], vh = viewport[3] - viewport[1];
