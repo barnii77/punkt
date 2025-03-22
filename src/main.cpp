@@ -48,11 +48,7 @@ int main() {
 ////////////////////// TODOS //////////////////////
 
 // TODO handle `{rank=same; A B C;}` constraint blocks
-// TODO respect edge count in the edge reordering (i.e. the "+= instead of =" todo) and the weight property on edges
-    // the weight property should just be treated as if there were N edges instead of 1, i.e. trivial once the first
-    // TODO is implemented
 // TODO handle spline edges
-// TODO handle `graph [...]` similar to `edge [...]` and `node [...]`
 // TODO make the glyph loader LRU style throw out (and delete) textures when a texture limit is reached
 // TODO I have node order computation kinda working, so now, when I have graph layout computation, I should decide
 // whether I want another x position optimization step that optimizes the gaps between nodes (without changing their

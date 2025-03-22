@@ -133,7 +133,7 @@ static Attrs consumeAttrs(std::span<tokenizer::Token> &tokens) {
 }
 
 // merge attrs such that attrs in b shadow attrs in a
-static void mergeAttrs(const Attrs &a, Attrs &b) {
+static void mergeAttrsInto(const Attrs &a, Attrs &b) {
     b.insert(a.begin(), a.end());
 }
 
@@ -163,12 +163,16 @@ static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::T
         // handle special keywords: for now only `node` and `edge` (which set default attrs)
         if (const std::string_view &kwd = a.m_value; kwd == KWD_NODE) {
             Attrs new_attrs = consumeAttrs(tokens);
-            mergeAttrs(dg.m_default_node_attrs, new_attrs);
+            mergeAttrsInto(dg.m_default_node_attrs, new_attrs);
             dg.m_default_node_attrs = std::move(new_attrs);
         } else if (kwd == KWD_EDGE) {
             Attrs new_attrs = consumeAttrs(tokens);
-            mergeAttrs(dg.m_default_edge_attrs, new_attrs);
+            mergeAttrsInto(dg.m_default_edge_attrs, new_attrs);
             dg.m_default_edge_attrs = std::move(new_attrs);
+        } else if (kwd == KWD_GRAPH) {
+            Attrs new_attrs = consumeAttrs(tokens);
+            mergeAttrsInto(dg.m_attrs, new_attrs);
+            dg.m_attrs = std::move(new_attrs);
         } else if (kwd == KWD_SUBGRAPH) {
             // save the defaults
             const Attrs default_node_attrs = dg.m_default_node_attrs;
@@ -200,7 +204,7 @@ static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::T
         Attrs attrs = consumeAttrs(tokens);
         validateAttrs(attrs);
         // handle defaults set by `node [...];`
-        mergeAttrs(dg.m_default_edge_attrs, attrs);
+        mergeAttrsInto(dg.m_default_edge_attrs, attrs);
 
         // assign attrs
         for (Edge &e: new_edges) {
@@ -222,7 +226,7 @@ static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::T
         Attrs attrs = consumeAttrs(tokens);
         validateAttrs(attrs);
         // handle defaults set by `node [...];`
-        mergeAttrs(dg.m_default_node_attrs, attrs);
+        mergeAttrsInto(dg.m_default_node_attrs, attrs);
 
         dg.m_nodes.insert_or_assign(a.m_value, Node(a.m_value, attrs));
     }

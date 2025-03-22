@@ -17,6 +17,8 @@ TEST(parser, SimpleTest) {
     std::string dot_source = R"(
         digraph MyGraph {
             // Set default attributes for nodes and edges.
+            rankdir=BT;
+            graph [label="test", five=5];
             node [color=red, shape=circle];
             edge [style=dotted, weight=1];
 
@@ -49,6 +51,10 @@ TEST(parser, SimpleTest) {
     // === Graph Basics ===
     // Check that the graph name was correctly set.
     EXPECT_EQ(dg.m_name, "MyGraph");
+    std::unordered_map<std::string_view, std::string_view> expected_graph_attrs{
+        {"rankdir", "BT"}, {"label", "test"}, {"five", "5"}
+    };
+    EXPECT_EQ(dg.m_attrs, expected_graph_attrs);
 
     // Check that the default node attributes were captured.
     ASSERT_TRUE(dg.m_default_node_attrs.find("color") != dg.m_default_node_attrs.end());
@@ -66,14 +72,14 @@ TEST(parser, SimpleTest) {
 
     // Node A: declared explicitly without attributes, so it should use the default node attrs.
     ASSERT_TRUE(dg.m_nodes.contains("A"));
-    const Node& nodeA = dg.m_nodes.at("A");
+    const Node &nodeA = dg.m_nodes.at("A");
     EXPECT_EQ(nodeA.m_name, "A");
     EXPECT_EQ(nodeA.m_attrs.at("color"), "red");
     EXPECT_EQ(nodeA.m_attrs.at("shape"), "circle");
 
     // Node B: declared with an explicit shape override.
     ASSERT_TRUE(dg.m_nodes.contains("B"));
-    const Node& nodeB = dg.m_nodes.at("B");
+    const Node &nodeB = dg.m_nodes.at("B");
     EXPECT_EQ(nodeB.m_name, "B");
     // Explicit "shape" should override the default, but missing keys are filled in.
     EXPECT_EQ(nodeB.m_attrs.at("color"), "red");
@@ -82,18 +88,18 @@ TEST(parser, SimpleTest) {
     // Nodes C and D: created implicitly in the edge chain.
     // They are created with an empty attribute map.
     ASSERT_TRUE(dg.m_nodes.contains("C"));
-    const Node& nodeC = dg.m_nodes.at("C");
+    const Node &nodeC = dg.m_nodes.at("C");
     EXPECT_EQ(nodeC.m_name, "C");
     EXPECT_EQ(nodeC.m_attrs, dg.m_default_node_attrs);
 
     ASSERT_TRUE(dg.m_nodes.contains("D"));
-    const Node& nodeD = dg.m_nodes.at("D");
+    const Node &nodeD = dg.m_nodes.at("D");
     EXPECT_EQ(nodeD.m_name, "D");
     EXPECT_EQ(nodeD.m_attrs, dg.m_default_node_attrs);
 
     // Node E: declared explicitly with an override.
     ASSERT_TRUE(dg.m_nodes.contains("E"));
-    const Node& nodeE = dg.m_nodes.at("E");
+    const Node &nodeE = dg.m_nodes.at("E");
     EXPECT_EQ(nodeE.m_name, "E");
     // "color" is overridden to blue; missing "shape" comes from defaults.
     EXPECT_EQ(nodeE.m_attrs.at("color"), "blue");
@@ -115,35 +121,35 @@ TEST(parser, SimpleTest) {
 
     // For node A, expect one outgoing edge: A -> B.
     ASSERT_EQ(nodeA.m_outgoing.size(), 1);
-    const Edge& edgeAB = nodeA.m_outgoing.front();
+    const Edge &edgeAB = nodeA.m_outgoing.front();
     EXPECT_EQ(edgeAB.m_source, "A");
     EXPECT_EQ(edgeAB.m_dest, "B");
-    for (const auto& [key, val] : expectedEdgeAttrsChain) {
+    for (const auto &[key, val]: expectedEdgeAttrsChain) {
         EXPECT_EQ(edgeAB.m_attrs.at(key), val);
     }
 
     // For node B, expect one outgoing edge: B -> C.
     ASSERT_EQ(nodeB.m_outgoing.size(), 1);
-    const Edge& edgeBC = nodeB.m_outgoing.front();
+    const Edge &edgeBC = nodeB.m_outgoing.front();
     EXPECT_EQ(edgeBC.m_source, "B");
     EXPECT_EQ(edgeBC.m_dest, "C");
-    for (const auto& [key, val] : expectedEdgeAttrsChain) {
+    for (const auto &[key, val]: expectedEdgeAttrsChain) {
         EXPECT_EQ(edgeBC.m_attrs.at(key), val);
     }
 
     // For node C, expect one outgoing edge: C -> D.
     ASSERT_EQ(nodeC.m_outgoing.size(), 1);
-    const Edge& edgeCD = nodeC.m_outgoing.front();
+    const Edge &edgeCD = nodeC.m_outgoing.front();
     EXPECT_EQ(edgeCD.m_source, "C");
     EXPECT_EQ(edgeCD.m_dest, "D");
-    for (const auto& [key, val] : expectedEdgeAttrsChain) {
+    for (const auto &[key, val]: expectedEdgeAttrsChain) {
         EXPECT_EQ(edgeCD.m_attrs.at(key), val);
     }
 
     // The isolated edge "D -> E" should have no explicit attributes,
     // so its attributes should be exactly the default edge attributes.
     ASSERT_EQ(nodeD.m_outgoing.size(), 1);
-    const Edge& edgeDE = nodeD.m_outgoing.front();
+    const Edge &edgeDE = nodeD.m_outgoing.front();
     EXPECT_EQ(edgeDE.m_source, "D");
     EXPECT_EQ(edgeDE.m_dest, "E");
     EXPECT_EQ(edgeDE.m_attrs.at("style"), "dotted");
@@ -156,7 +162,7 @@ TEST(parser, SimpleTest) {
     const Edge &ingoingB = nodeB.m_ingoing.front();
     EXPECT_EQ(ingoingB.m_source, "A");
     EXPECT_EQ(ingoingB.m_dest, "B");
-    for (const auto& [key, val] : expectedEdgeAttrsChain) {
+    for (const auto &[key, val]: expectedEdgeAttrsChain) {
         EXPECT_EQ(ingoingB.m_attrs.at(key), val);
     }
 
@@ -165,7 +171,7 @@ TEST(parser, SimpleTest) {
     const Edge &ingoingC = nodeC.m_ingoing.front();
     EXPECT_EQ(ingoingC.m_source, "B");
     EXPECT_EQ(ingoingC.m_dest, "C");
-    for (const auto& [key, val] : expectedEdgeAttrsChain) {
+    for (const auto &[key, val]: expectedEdgeAttrsChain) {
         EXPECT_EQ(ingoingC.m_attrs.at(key), val);
     }
 
@@ -174,7 +180,7 @@ TEST(parser, SimpleTest) {
     const Edge &ingoingD = nodeD.m_ingoing.front();
     EXPECT_EQ(ingoingD.m_source, "C");
     EXPECT_EQ(ingoingD.m_dest, "D");
-    for (const auto& [key, val] : expectedEdgeAttrsChain) {
+    for (const auto &[key, val]: expectedEdgeAttrsChain) {
         EXPECT_EQ(ingoingD.m_attrs.at(key), val);
     }
 
@@ -282,7 +288,7 @@ TEST(parser, ComplexCyclicTest) {
 
     // Node X: Declared in the first block; attributes from initial defaults.
     ASSERT_TRUE(dg.m_nodes.contains("X"));
-    const Node& nodeX = dg.m_nodes.at("X");
+    const Node &nodeX = dg.m_nodes.at("X");
     std::unordered_map<std::string_view, std::string_view> expectedX{
         {"color", "green"}, {"shape", "ellipse"}, {"fontname", "Arial"}
     };
@@ -290,7 +296,7 @@ TEST(parser, ComplexCyclicTest) {
 
     // Node Y: Declared in the first block with override [color=blue].
     ASSERT_TRUE(dg.m_nodes.contains("Y"));
-    const Node& nodeY = dg.m_nodes.at("Y");
+    const Node &nodeY = dg.m_nodes.at("Y");
     std::unordered_map<std::string_view, std::string_view> expectedY{
         {"color", "blue"}, {"shape", "ellipse"}, {"fontname", "Arial"}
     };
@@ -298,18 +304,18 @@ TEST(parser, ComplexCyclicTest) {
 
     // Node Z: Declared explicitly; from initial defaults.
     ASSERT_TRUE(dg.m_nodes.contains("Z"));
-    const Node& nodeZ = dg.m_nodes.at("Z");
+    const Node &nodeZ = dg.m_nodes.at("Z");
     EXPECT_EQ(nodeZ.m_attrs, expectedX);
 
     // Node W: Declared after the node default update; should have the new defaults.
     ASSERT_TRUE(dg.m_nodes.contains("W"));
-    const Node& nodeW = dg.m_nodes.at("W");
+    const Node &nodeW = dg.m_nodes.at("W");
     EXPECT_EQ(nodeW.m_attrs, expectedFinalNodeDefaults);
 
     // Node V: Declared with explicit [shape=box, fontsize=16] after update;
     // expected: explicit keys override, merged with inherited {color=purple, fontname="Arial"}.
     ASSERT_TRUE(dg.m_nodes.contains("V"));
-    const Node& nodeV = dg.m_nodes.at("V");
+    const Node &nodeV = dg.m_nodes.at("V");
     std::unordered_map<std::string_view, std::string_view> expectedV{
         {"shape", "box"}, {"fontsize", "16"}, {"color", "purple"}, {"fontname", "Arial"}
     };
@@ -317,12 +323,12 @@ TEST(parser, ComplexCyclicTest) {
 
     // Node U: Implicitly created in Edge Chain 2; no attributes.
     ASSERT_TRUE(dg.m_nodes.contains("U"));
-    const Node& nodeU = dg.m_nodes.at("U");
+    const Node &nodeU = dg.m_nodes.at("U");
     EXPECT_EQ(nodeU.m_attrs, dg.m_default_node_attrs);
 
     // Node T: Declared explicitly with overrides; merge with updated defaults.
     ASSERT_TRUE(dg.m_nodes.contains("T"));
-    const Node& nodeT = dg.m_nodes.at("T");
+    const Node &nodeT = dg.m_nodes.at("T");
     std::unordered_map<std::string_view, std::string_view> expectedT{
         {"color", "orange"}, {"fontname", "Courier"}, {"fontsize", "12"}, {"shape", "ellipse"}
     };
@@ -339,9 +345,9 @@ TEST(parser, ComplexCyclicTest) {
     // Note: Later we add a cycle edge from X -> T.
     ASSERT_EQ(nodeX.m_outgoing.size(), 2);
     auto edgeXY_it = std::find_if(nodeX.m_outgoing.begin(), nodeX.m_outgoing.end(),
-                                  [](const Edge &e){ return e.m_dest == "Y"; });
+                                  [](const Edge &e) { return e.m_dest == "Y"; });
     ASSERT_NE(edgeXY_it, nodeX.m_outgoing.end());
-    for (const auto & [key, val] : expectedChain1) {
+    for (const auto &[key, val]: expectedChain1) {
         EXPECT_EQ(edgeXY_it->m_attrs.at(key), val);
     }
 
@@ -353,18 +359,18 @@ TEST(parser, ComplexCyclicTest) {
     // For node Y, expect an outgoing edge: Y -> W.
     ASSERT_EQ(nodeY.m_outgoing.size(), 2);
     auto edgeYW_it = std::find_if(nodeY.m_outgoing.begin(), nodeY.m_outgoing.end(),
-                                  [](const Edge &e){ return e.m_dest == "W"; });
+                                  [](const Edge &e) { return e.m_dest == "W"; });
     ASSERT_NE(edgeYW_it, nodeY.m_outgoing.end());
-    for (const auto & [key, val] : expectedChain2) {
+    for (const auto &[key, val]: expectedChain2) {
         EXPECT_EQ(edgeYW_it->m_attrs.at(key), val);
     }
 
     // For node W, expect one outgoing edge: W -> V.
     ASSERT_EQ(nodeW.m_outgoing.size(), 1);
-    const Edge& edgeWV = nodeW.m_outgoing.front();
+    const Edge &edgeWV = nodeW.m_outgoing.front();
     EXPECT_EQ(edgeWV.m_source, "W");
     EXPECT_EQ(edgeWV.m_dest, "V");
-    for (const auto & [key, val] : expectedChain2) {
+    for (const auto &[key, val]: expectedChain2) {
         EXPECT_EQ(edgeWV.m_attrs.at(key), val);
     }
 
@@ -372,9 +378,9 @@ TEST(parser, ComplexCyclicTest) {
     // Also, V has a cycle edge later.
     ASSERT_EQ(nodeV.m_outgoing.size(), 2);
     auto edgeVU_it = std::find_if(nodeV.m_outgoing.begin(), nodeV.m_outgoing.end(),
-                                  [](const Edge &e){ return e.m_dest == "U"; });
+                                  [](const Edge &e) { return e.m_dest == "U"; });
     ASSERT_NE(edgeVU_it, nodeV.m_outgoing.end());
-    for (const auto & [key, val] : expectedChain2) {
+    for (const auto &[key, val]: expectedChain2) {
         EXPECT_EQ(edgeVU_it->m_attrs.at(key), val);
     }
 
@@ -383,10 +389,10 @@ TEST(parser, ComplexCyclicTest) {
         {"label", "BackEdge"}, {"style", "bold"}, {"weight", "1"}
     };
     ASSERT_EQ(nodeU.m_outgoing.size(), 1);
-    const Edge& edgeUX = nodeU.m_outgoing.front();
+    const Edge &edgeUX = nodeU.m_outgoing.front();
     EXPECT_EQ(edgeUX.m_source, "U");
     EXPECT_EQ(edgeUX.m_dest, "X");
-    for (const auto & [key, val] : expectedIsoEdge1) {
+    for (const auto &[key, val]: expectedIsoEdge1) {
         EXPECT_EQ(edgeUX.m_attrs.at(key), val);
     }
 
@@ -394,11 +400,11 @@ TEST(parser, ComplexCyclicTest) {
     std::unordered_map<std::string_view, std::string_view> expectedIsoEdge2{
         {"style", "bold"}, {"weight", "1"}
     };
-    ASSERT_EQ(nodeT.m_outgoing.size(), 2);  // T has two outgoing edges: T->V and a cycle edge T->X.
+    ASSERT_EQ(nodeT.m_outgoing.size(), 2); // T has two outgoing edges: T->V and a cycle edge T->X.
     auto edgeTV_it = std::find_if(nodeT.m_outgoing.begin(), nodeT.m_outgoing.end(),
-                                  [](const Edge &e){ return e.m_dest == "V"; });
+                                  [](const Edge &e) { return e.m_dest == "V"; });
     ASSERT_NE(edgeTV_it, nodeT.m_outgoing.end());
-    for (const auto & [key, val] : expectedIsoEdge2) {
+    for (const auto &[key, val]: expectedIsoEdge2) {
         EXPECT_EQ(edgeTV_it->m_attrs.at(key), val);
     }
 
@@ -409,9 +415,9 @@ TEST(parser, ComplexCyclicTest) {
         {"label", "CycleEdge1"}, {"style", "bold"}, {"weight", "1"}
     };
     auto edgeVY_it = std::find_if(nodeV.m_outgoing.begin(), nodeV.m_outgoing.end(),
-                                  [](const Edge &e){ return e.m_dest == "Y"; });
+                                  [](const Edge &e) { return e.m_dest == "Y"; });
     ASSERT_NE(edgeVY_it, nodeV.m_outgoing.end());
-    for (const auto & [key, val] : expectedCycleEdge) {
+    for (const auto &[key, val]: expectedCycleEdge) {
         EXPECT_EQ(edgeVY_it->m_attrs.at(key), val);
     }
 
@@ -420,9 +426,9 @@ TEST(parser, ComplexCyclicTest) {
         {"label", "CycleEdge2"}, {"style", "bold"}, {"weight", "1"}
     };
     auto edgeTX_it = std::find_if(nodeT.m_outgoing.begin(), nodeT.m_outgoing.end(),
-                                  [](const Edge &e){ return e.m_dest == "X"; });
+                                  [](const Edge &e) { return e.m_dest == "X"; });
     ASSERT_NE(edgeTX_it, nodeT.m_outgoing.end());
-    for (const auto & [key, val] : expectedCycleEdge2) {
+    for (const auto &[key, val]: expectedCycleEdge2) {
         EXPECT_EQ(edgeTX_it->m_attrs.at(key), val);
     }
 
@@ -431,9 +437,9 @@ TEST(parser, ComplexCyclicTest) {
         {"label", "CycleEdge3"}, {"style", "bold"}, {"weight", "1"}
     };
     auto edgeXT_it = std::find_if(nodeX.m_outgoing.begin(), nodeX.m_outgoing.end(),
-                                  [](const Edge &e){ return e.m_dest == "T"; });
+                                  [](const Edge &e) { return e.m_dest == "T"; });
     ASSERT_NE(edgeXT_it, nodeX.m_outgoing.end());
-    for (const auto & [key, val] : expectedCycleEdge3) {
+    for (const auto &[key, val]: expectedCycleEdge3) {
         EXPECT_EQ(edgeXT_it->m_attrs.at(key), val);
     }
 
@@ -442,10 +448,10 @@ TEST(parser, ComplexCyclicTest) {
         {"label", "SelfLoop"}, {"style", "bold"}, {"weight", "1"}
     };
     ASSERT_EQ(nodeZ.m_outgoing.size(), 1);
-    const Edge& edgeZZ = nodeZ.m_outgoing.front();
+    const Edge &edgeZZ = nodeZ.m_outgoing.front();
     EXPECT_EQ(edgeZZ.m_source, "Z");
     EXPECT_EQ(edgeZZ.m_dest, "Z");
-    for (const auto & [key, val] : expectedSelfLoop) {
+    for (const auto &[key, val]: expectedSelfLoop) {
         EXPECT_EQ(edgeZZ.m_attrs.at(key), val);
     }
 
@@ -454,45 +460,45 @@ TEST(parser, ComplexCyclicTest) {
     // For node X, ingoing edges should be from U->X (BackEdge) and T->X (CycleEdge2).
     ASSERT_EQ(nodeX.m_ingoing.size(), 2);
     auto incX_back = std::find_if(nodeX.m_ingoing.begin(), nodeX.m_ingoing.end(),
-                                  [](const Edge &e){ return e.m_source == "U" && e.m_dest == "X"; });
+                                  [](const Edge &e) { return e.m_source == "U" && e.m_dest == "X"; });
     ASSERT_NE(incX_back, nodeX.m_ingoing.end());
-    for (const auto & [key, val] : expectedIsoEdge1) {
+    for (const auto &[key, val]: expectedIsoEdge1) {
         EXPECT_EQ(incX_back->get().m_attrs.at(key), val);
     }
     auto incX_cycle = std::find_if(nodeX.m_ingoing.begin(), nodeX.m_ingoing.end(),
-                                   [](const Edge &e){ return e.m_source == "T" && e.m_dest == "X"; });
+                                   [](const Edge &e) { return e.m_source == "T" && e.m_dest == "X"; });
     ASSERT_NE(incX_cycle, nodeX.m_ingoing.end());
-    for (const auto & [key, val] : expectedCycleEdge2) {
+    for (const auto &[key, val]: expectedCycleEdge2) {
         EXPECT_EQ(incX_cycle->get().m_attrs.at(key), val);
     }
 
     // For node Y, ingoing edges should be from X->Y (Chain1) and V->Y (CycleEdge1).
     ASSERT_EQ(nodeY.m_ingoing.size(), 2);
     auto incY_chain = std::find_if(nodeY.m_ingoing.begin(), nodeY.m_ingoing.end(),
-                                   [](const Edge &e){ return e.m_source == "X" && e.m_dest == "Y"; });
+                                   [](const Edge &e) { return e.m_source == "X" && e.m_dest == "Y"; });
     ASSERT_NE(incY_chain, nodeY.m_ingoing.end());
-    for (const auto & [key, val] : expectedChain1) {
+    for (const auto &[key, val]: expectedChain1) {
         EXPECT_EQ(incY_chain->get().m_attrs.at(key), val);
     }
     auto incY_cycle = std::find_if(nodeY.m_ingoing.begin(), nodeY.m_ingoing.end(),
-                                   [](const Edge &e){ return e.m_source == "V" && e.m_dest == "Y"; });
+                                   [](const Edge &e) { return e.m_source == "V" && e.m_dest == "Y"; });
     ASSERT_NE(incY_cycle, nodeY.m_ingoing.end());
-    for (const auto & [key, val] : expectedCycleEdge) {
+    for (const auto &[key, val]: expectedCycleEdge) {
         EXPECT_EQ(incY_cycle->get().m_attrs.at(key), val);
     }
 
     // For node Z, ingoing edges should be from Y->Z (Chain1) and the self-loop Z->Z.
     ASSERT_EQ(nodeZ.m_ingoing.size(), 2);
     auto incZ_chain = std::find_if(nodeZ.m_ingoing.begin(), nodeZ.m_ingoing.end(),
-                                   [](const Edge &e){ return e.m_source == "Y" && e.m_dest == "Z"; });
+                                   [](const Edge &e) { return e.m_source == "Y" && e.m_dest == "Z"; });
     ASSERT_NE(incZ_chain, nodeZ.m_ingoing.end());
-    for (const auto & [key, val] : expectedChain1) {
+    for (const auto &[key, val]: expectedChain1) {
         EXPECT_EQ(incZ_chain->get().m_attrs.at(key), val);
     }
     auto incZ_self = std::find_if(nodeZ.m_ingoing.begin(), nodeZ.m_ingoing.end(),
-                                  [](const Edge &e){ return e.m_source == "Z" && e.m_dest == "Z"; });
+                                  [](const Edge &e) { return e.m_source == "Z" && e.m_dest == "Z"; });
     ASSERT_NE(incZ_self, nodeZ.m_ingoing.end());
-    for (const auto & [key, val] : expectedSelfLoop) {
+    for (const auto &[key, val]: expectedSelfLoop) {
         EXPECT_EQ(incZ_self->get().m_attrs.at(key), val);
     }
 
@@ -501,22 +507,22 @@ TEST(parser, ComplexCyclicTest) {
     const Edge &incW = nodeW.m_ingoing.front();
     EXPECT_EQ(incW.m_source, "Y");
     EXPECT_EQ(incW.m_dest, "W");
-    for (const auto & [key, val] : expectedChain2) {
+    for (const auto &[key, val]: expectedChain2) {
         EXPECT_EQ(incW.m_attrs.at(key), val);
     }
 
     // For node V, ingoing edges should be from W->V (Chain2) and T->V (Isolated Edge 2).
     ASSERT_EQ(nodeV.m_ingoing.size(), 2);
     auto incV_chain = std::find_if(nodeV.m_ingoing.begin(), nodeV.m_ingoing.end(),
-                                   [](const Edge &e){ return e.m_source == "W" && e.m_dest == "V"; });
+                                   [](const Edge &e) { return e.m_source == "W" && e.m_dest == "V"; });
     ASSERT_NE(incV_chain, nodeV.m_ingoing.end());
-    for (const auto & [key, val] : expectedChain2) {
+    for (const auto &[key, val]: expectedChain2) {
         EXPECT_EQ(incV_chain->get().m_attrs.at(key), val);
     }
     auto incV_iso = std::find_if(nodeV.m_ingoing.begin(), nodeV.m_ingoing.end(),
-                                 [](const Edge &e){ return e.m_source == "T" && e.m_dest == "V"; });
+                                 [](const Edge &e) { return e.m_source == "T" && e.m_dest == "V"; });
     ASSERT_NE(incV_iso, nodeV.m_ingoing.end());
-    for (const auto & [key, val] : expectedIsoEdge2) {
+    for (const auto &[key, val]: expectedIsoEdge2) {
         EXPECT_EQ(incV_iso->get().m_attrs.at(key), val);
     }
 
@@ -525,7 +531,7 @@ TEST(parser, ComplexCyclicTest) {
     const Edge &incU = nodeU.m_ingoing.front();
     EXPECT_EQ(incU.m_source, "V");
     EXPECT_EQ(incU.m_dest, "U");
-    for (const auto & [key, val] : expectedChain2) {
+    for (const auto &[key, val]: expectedChain2) {
         EXPECT_EQ(incU.m_attrs.at(key), val);
     }
 
@@ -534,7 +540,7 @@ TEST(parser, ComplexCyclicTest) {
     const Edge &incT = nodeT.m_ingoing.front();
     EXPECT_EQ(incT.m_source, "X");
     EXPECT_EQ(incT.m_dest, "T");
-    for (const auto & [key, val] : expectedCycleEdge3) {
+    for (const auto &[key, val]: expectedCycleEdge3) {
         EXPECT_EQ(incT.m_attrs.at(key), val);
     }
 }
