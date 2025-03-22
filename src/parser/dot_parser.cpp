@@ -120,8 +120,10 @@ static Attrs consumeAttrs(std::span<tokenizer::Token> &tokens) {
         attrs.insert_or_assign(key, value);
         if (nextTokenIs(tokens, tokenizer::Token::Type::comma)) {
             expectAndConsume(tokens, tokenizer::Token::Type::comma);
-        } else if (!nextTokenIs(tokens, tokenizer::Token::Type::rsq)) {
-            // got something that is not `,` or `]` after a style attribute, e.g. `[color=red, style=dotted >>}<<]`
+        } else if (!nextTokenIs(tokens, tokenizer::Token::Type::rsq) && !nextTokenIs(
+                       tokens, tokenizer::Token::Type::string)) {
+            // Got something that is not `,` or `]` after a style attribute, e.g. `[color=red, style=dotted >>}<<]`.
+            // Now, there is the special case where we have an attr list without comma separation, which doesn't throw.
             throw UnexpectedTokenException(tokens.front());
         }
     }
@@ -149,12 +151,15 @@ static void validateAttrs(const Attrs &attrs) {
     }
 }
 
-static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::Token> &tokens) {
-    // TODO handle clusters and sub-graphs here
-    static std::array expected_token_types = {tokenizer::Token::Type::string, tokenizer::Token::Type::kwd};
-    tokenizer::Token a = expectAndConsumeOneOf(tokens, expected_token_types);
+static std::string consumeGraphSourceAndUpdateDigraph(Digraph &dg, std::span<tokenizer::Token> &tokens);
 
-    if (a.m_type == tokenizer::Token::Type::kwd) {
+static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::Token> &tokens) {
+    assert(!tokens.empty());
+    static std::array expected_token_types = {tokenizer::Token::Type::string, tokenizer::Token::Type::kwd};
+    std::span<tokenizer::Token> unconsumed_tokens = tokens;
+
+    if (tokenizer::Token a = expectAndConsumeOneOf(tokens, expected_token_types);
+        a.m_type == tokenizer::Token::Type::kwd) {
         // handle special keywords: for now only `node` and `edge` (which set default attrs)
         if (const std::string_view &kwd = a.m_value; kwd == KWD_NODE) {
             Attrs new_attrs = consumeAttrs(tokens);
@@ -164,6 +169,16 @@ static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::T
             Attrs new_attrs = consumeAttrs(tokens);
             mergeAttrs(dg.m_default_edge_attrs, new_attrs);
             dg.m_default_edge_attrs = std::move(new_attrs);
+        } else if (kwd == KWD_SUBGRAPH) {
+            // save the defaults
+            const Attrs default_node_attrs = dg.m_default_node_attrs;
+            const Attrs default_edge_attrs = dg.m_default_edge_attrs;
+            // parse subgraph
+            consumeGraphSourceAndUpdateDigraph(dg, unconsumed_tokens);
+            tokens = unconsumed_tokens;
+            // restore the defaults
+            dg.m_default_node_attrs = default_node_attrs;
+            dg.m_default_edge_attrs = default_edge_attrs;
         } else {
             throw UnexpectedTokenException(a);
         }
@@ -212,8 +227,32 @@ static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::T
         dg.m_nodes.insert_or_assign(a.m_value, Node(a.m_value, attrs));
     }
 
-    // every statement ends with a semicolon
-    expectAndConsume(tokens, tokenizer::Token::Type::semicolon);
+    // every statement should end with a semicolon (we don't crash if it doesn't though)
+    if (nextTokenIs(tokens, tokenizer::Token::Type::semicolon)) {
+        expectAndConsume(tokens, tokenizer::Token::Type::semicolon);
+    }
+}
+
+static std::string consumeGraphSourceAndUpdateDigraph(Digraph &dg, std::span<tokenizer::Token> &tokens) {
+    if (const auto tok = expectAndConsume(tokens, tokenizer::Token::Type::kwd);
+        tok.m_value != KWD_DIGRAPH && tok.m_value != KWD_SUBGRAPH && tok.m_value != KWD_GRAPH) {
+        throw UnexpectedTokenException(tok);
+    }
+    std::string name;
+    if (nextTokenIs(tokens, tokenizer::Token::Type::string)) {
+        name = expectAndConsume(tokens, tokenizer::Token::Type::string).m_value;
+    }
+    if (name.starts_with("cluster_")) {
+        // TODO handle clusters here
+        throw std::runtime_error("not implemented");
+    }
+    expectAndConsume(tokens, tokenizer::Token::Type::lcurly);
+    while (!tokens.empty() && !nextTokenIs(tokens, tokenizer::Token::Type::rcurly)) {
+        consumeStatementAndUpdateDigraph(dg, tokens);
+    }
+    expectAndConsume(tokens, tokenizer::Token::Type::rcurly);
+    // everything after the graph is ignored
+    return name;
 }
 
 Digraph::Digraph() = default;
@@ -222,15 +261,7 @@ Digraph::Digraph(std::string source)
     : m_source(std::move(source)) {
     std::vector<tokenizer::Token> tokens_vec = tokenizer::tokenize(*this, m_source);
     std::span tokens = tokens_vec;
-
-    expectAndConsume(tokens, tokenizer::Token::Type::kwd, KWD_DIGRAPH);
-    m_name = expectAndConsume(tokens, tokenizer::Token::Type::string).m_value;
-    expectAndConsume(tokens, tokenizer::Token::Type::lcurly);
-    while (!tokens.empty() && !nextTokenIs(tokens, tokenizer::Token::Type::rcurly)) {
-        consumeStatementAndUpdateDigraph(*this, tokens);
-    }
-    expectAndConsume(tokens, tokenizer::Token::Type::rcurly);
-    // everything after the first graph is ignored
+    consumeGraphSourceAndUpdateDigraph(*this, tokens);
 }
 
 Digraph::Digraph(const std::string_view source)

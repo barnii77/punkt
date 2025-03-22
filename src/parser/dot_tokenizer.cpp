@@ -12,6 +12,7 @@ static std::unordered_set<std::string_view> keywords = {
     KWD_NODE,
     KWD_GRAPH,
     KWD_DIGRAPH,
+    KWD_SUBGRAPH,
 };
 
 Token::Token(const std::string_view value, const Type type)

@@ -53,7 +53,7 @@ glyph::GlyphCharInfo transformGciForZoom(const glyph::GlyphCharInfo &gci, float 
 void GLRenderer::renderFrame() {
     GL_CHECK(glClear(GL_COLOR_BUFFER_BIT));
 
-    // draw nodes
+    // draw graph/cluster/node shapes (in that order)
     GL_CHECK(glUseProgram(m_nodes_shader));
     GL_CHECK(glUniform2f(glGetUniformLocation(m_nodes_shader, "viewport_size"), static_cast<GLfloat>(m_viewport_w),
         static_cast<GLfloat>(m_viewport_h)));
@@ -61,6 +61,15 @@ void GLRenderer::renderFrame() {
         static_cast<GLfloat>(m_camera_y)));
     GL_CHECK(glUniform1f(glGetUniformLocation(m_nodes_shader, "zoom"), m_zoom));
 
+    // graph
+    GL_CHECK(glBindVertexArray(m_digraph_quad_buffer));
+    GL_CHECK(glDrawArraysInstanced(GL_POINTS, 0, 1, 1));
+
+    // clusters
+    GL_CHECK(glBindVertexArray(m_cluster_quads_buffer));
+    GL_CHECK(glDrawArraysInstanced(GL_POINTS, 0, 1, static_cast<GLsizei>(m_cluster_quads.size())));
+
+    // nodes
     GL_CHECK(glBindVertexArray(m_node_quad_buffer));
     GL_CHECK(glDrawArraysInstanced(GL_POINTS, 0, 1, static_cast<GLsizei>(m_node_quads.size())));
 

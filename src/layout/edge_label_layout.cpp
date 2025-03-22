@@ -7,6 +7,8 @@
 #include <cassert>
 #include <array>
 
+#include "punkt/dot_constants.hpp"
+
 using namespace punkt;
 
 static void offsetQuads(std::vector<GlyphQuad> &quads, const Vector2<size_t> offset) {
@@ -67,7 +69,7 @@ void Digraph::computeEdgeLabelLayouts(const render::glyph::GlyphLoader &glyph_lo
             const Node &destination = m_nodes.at(edge.m_dest);
             size_t max_line_width{}, height{};
             const size_t font_size =
-                    getAttrTransformedCheckedOrDefault(edge.m_attrs, "fontsize", 14, stringViewToSizeT);
+                    getAttrTransformedCheckedOrDefault(edge.m_attrs, "fontsize", default_font_size, stringViewToSizeT);
 
             if (const std::string_view &label = getAttrOrDefault(edge.m_attrs, "label", ""); !label.empty()) {
                 populateGlyphQuadsWithText(label, font_size, TextAlignment::center, glyph_loader,
@@ -77,7 +79,7 @@ void Digraph::computeEdgeLabelLayouts(const render::glyph::GlyphLoader &glyph_lo
                                                      getAttrOrDefault(m_attrs, "splines", "false") != "false");
                 const ssize_t x_dir_dependent_offset = destination.m_render_attrs.m_x < node.m_render_attrs.m_x
                                                                  ? -static_cast<ssize_t>(font_size)
-                                                                 : font_size;
+                                                                 : static_cast<ssize_t>(font_size);
                 const auto top_left = Vector2(center.x + x_dir_dependent_offset,
                                               center.y - height / 2);
                 offsetQuads(edge.m_render_attrs.m_label_quads, top_left);

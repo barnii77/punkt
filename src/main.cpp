@@ -1,128 +1,85 @@
 #include "punkt/punkt.h"
 
+#include <string>
+#include <fstream>
+
+class FileNotFoundException final : std::exception {
+    const std::string m_path;
+
+    [[nodiscard]] const char *what() const noexcept override;
+
+public:
+    explicit FileNotFoundException(std::string path);
+};
+
+FileNotFoundException::FileNotFoundException(std::string path)
+    : m_path(std::move(path)) {
+}
+
+const char *FileNotFoundException::what() const noexcept {
+    const std::string msg = std::string("Font not found: \"") + std::string(m_path);
+    const auto m = new char[msg.length() + 1];
+    msg.copy(m, msg.length());
+    m[msg.length()] = '\0';
+    return m;
+}
+
+static std::string readInputFile(const char *path) {
+    std::ifstream font_file(path, std::ios::binary);
+    if (!font_file) {
+        throw FileNotFoundException(path);
+    }
+
+    font_file.seekg(0, std::ios::end);
+    const std::streamsize file_size = font_file.tellg();
+    font_file.seekg(0, std::ios::beg);
+
+    std::string out(file_size, '\0');
+    font_file.read(out.data(), file_size);
+    return out;
+}
+
 int main() {
-    static auto test_input = R"(
-digraph G {
-    node [fillcolor=green];
-    A [fontcolor=red, label="hello world!", penwidth=5];
-    A -> B [penwidth=5, color=red];
-}
-)";
-    test_input = R"(
-        digraph GraphLayoutTest {
-            rankdir=TB;
-            ranksep=75;
-            nodesep=50;
-
-            A [label="Node A\nFirst rank"];
-            B [label="Node B\nFirst rank too"];
-            C [label="This is\nNode C\nSecond rank"];
-            D [label="D in\nsecond rank"];
-            E [label="E in third rank"];
-            F [label="F also\nin third rank"];
-            G [label="G in fourth"];
-
-            A -> C;
-            A -> D;
-            B -> C;
-            B -> D;
-            C -> E;
-            D -> F;
-            E -> G;
-            F -> G;
-        }
-)";
-    test_input = R"(
-digraph HugeCyclicGraph {
-    // Define nodes
-    node [shape=circle];
-
-    // Create a chain of nodes with a few added cycles
-    0 -> 1;  1 -> 2;  2 -> 3;  3 -> 4;  4 -> 5;
-    5 -> 6;  6 -> 7;  7 -> 8;  8 -> 9;  9 -> 10;
-    10 -> 11;  11 -> 12;  12 -> 13;  13 -> 14;  14 -> 15;
-    15 -> 16;  16 -> 17;  17 -> 18;  18 -> 19;  19 -> 20;
-    20 -> 21;  21 -> 22;  22 -> 23;  23 -> 24;  24 -> 25;
-    25 -> 26;  26 -> 27;  27 -> 28;  28 -> 29;
-
-    // Introduce some cycles
-    0 -> 10;
-    5 -> 15;
-    8 -> 18;
-    14 -> 24;
-    19 -> 9;
-    25 -> 5;
-    22 -> 17;
-    26 -> 7;
-}
-)";
-    test_input = R"(
-        digraph OptimalTest {
-            // Declare nodes (order in source is not necessarily preserved, but ranks will be computed)
-            node [shape=ellipse, fillcolor=red];
-            edge [headlabel="HI!", label="HO!", taillabel="HA?", fontsize=5];
-            AXYZ; B; C;
-            D; E; F;
-            G; H; I;
-            J;
-            // Edges:
-            A -> D;
-            B -> D;
-            C -> E;
-            A -> F;
-            D -> G;
-            E -> G;
-            D -> H;
-            B -> I;
-            F -> I;
-            G -> J;
-            H -> J;
-            F -> G;
-        }
-)";
-    test_input = R"(
-        digraph GraphLayoutTest {
-            rankdir=TB;
-            ranksep=75;
-            nodesep=50;
-
-            A [label="Node A\nFirst rank", fontsize=12];
-            B [label="Node B\nFirst rank too"];
-            C [label="This is\nNode C\nSecond rank"];
-            D [label="D in\nsecond rank", color=green];
-            E [label="E in third rank"];
-            F [label="F also\nin third rank", fillcolor=red];
-            G [label="G in fourth", shape=ellipse, penwidth=5.0];
-
-            A -> C [label="E1"];
-            A -> D;
-            B -> C [headlabel="E3"];
-            B -> D;
-            C -> E [taillabel="E5", label="E5"];
-            D -> F;
-            E -> G;
-            F -> G;
-            A -> G [headlabel="E42", label="E42", taillabel="E42", fontsize=7];
-        }
-)";
-    const char *font_path = nullptr;
-    font_path = "resources/fonts/tinyfont.psf";
-    punktRun(test_input, font_path);
+    const std::string test_input = readInputFile("examples/demo5.dot");
+    const auto font_path = "resources/fonts/tinyfont.psf";
+    punktRun(test_input.data(), font_path);
 }
 
 ////////////////////// TODOS //////////////////////
 
-// TODO in the last example there are some (i assume size_t truncating?) imperfections where ghost edges just don't
-// match in size and it looks really bad
+// TODO I should actually probably be zooming in towards where the mouse is, not the center of the screen
 // TODO handle spline edges
-// TODO handle subgraphs and clusters
+// TODO handle `{rank=same; A B C;}` constraint blocks
+// TODO handle `graph [...]` similar to `edge [...]` and `node [...]`
+// TODO make the glyph loader LRU style throw out (and delete) textures when a texture limit is reached
 // TODO I have node order computation kinda working, so now, when I have graph layout computation, I should decide
 // whether I want another x position optimization step that optimizes the gaps between nodes (without changing their
 // order) in a sort of physics sim with moving boxes thing? sounds like a bad idea but is it? I could also do a
 // greedy approach where I go from the leftmost and rightmost nodes inward (double pointer style), barycenter-like
 // moving each node and if it moves left (for the left pointer) or right (for right pointer), I can make more room
 // for the next nodes and continue going inward. On the other hand, maybe I want even spacing. So maybe NOT.
+// TODO handle graph level attributes `style` and `rankdir`
+// TODO in the last example there are some (i assume size_t truncating?) imperfections where ghost edges just don't
+// match in size and it looks really bad... investigate why I saw static_cast<GLuint>(0.5) round up at some point
+    // TODO can I make ghost nodes height 0 without breaking stuff?
 // TODO handle dashed and dotted edges
+// TODO a cluster should become a single super-node when doing all my layout computations. This means it is literally
+// treated as a single (giant) node with special attributes (@type = "cluster", @code = <string_view into the graph
+// source defining the cluster>) and assigned a single rank. Once we have computed the horizontal orderings, we convert
+// the node into a digraph by calling constructor and preprocess on Digraph(cluster_source).
+// Now, here's the really tricky part:
+// We have to re-route edges according to their `@source`s and `@dest`s now. For this, I am thinking of introducing a
+// new concept called "rail nodes", similar to ghost nodes, but they are not vertically centered like every other node
+// type. Instead, they are placed at the height of a particular rank within a particular cluster and have the height of
+// the bottom of that rank. To be specific, the cluster rank it will be positioned at is the rank above the `@dest`
+// rank (for @source substitution the process is similar). Depending on whether the edge is coming from the right or
+// left, the rail node will be placed right or left of the cluster node. Then, edges are routed through those rail nodes
+// normally. Once we have constructed these "rails" (the name makes sense because the edges kind of glide along the
+// vertical axis of the rank until a certain point, then the rail stops and they "derail"), we can do our node basic
+// positioning, then, once implemented, the additional spring/barycenter repositioning (however you want to call it) and
+// finally we can upward inherit all the nodes in the cluster into the main digraph by adding the cluster node position.
+// Also, don't forget to temporarily substitute edges to any nodes belonging to the cluster with an edge to the cluster
+// super-node. Use attributes @source and @dest to store the actual sources and destinations.
 // TODO handle DPI properly, currently, 1 dot = 1 pixel, but that's simply not true
 // TODO handle font loading manually - write a minimal TTF parser and renderer
 // TODO make sure this builds using all major build systems (make, ninja, visual studio msbuild)
@@ -134,3 +91,5 @@ digraph HugeCyclicGraph {
 // TODO maybe I could add drawing on top xD (i.e. you have a separate surface that you draw into in black and that
 // gets rendered last so it overdraws the graph
 // TODO XDD I can add animations because I don't have to comply with the dot language spec exactly, just roughly
+
+// TODO include examples from graphviz docs in examples/

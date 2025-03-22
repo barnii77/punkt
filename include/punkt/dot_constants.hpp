@@ -6,6 +6,8 @@
 
 constexpr std::string_view default_shape = "box";
 
+constexpr size_t default_font_size = 14;
+
 constexpr int expected_edge_line_length = 4;
 
 constexpr float arrow_scale = 5.0f;
@@ -13,6 +15,7 @@ constexpr float arrow_scale = 5.0f;
 constexpr auto KWD_NODE = "node";
 constexpr auto KWD_EDGE = "edge";
 constexpr auto KWD_DIGRAPH = "digraph";
+constexpr auto KWD_SUBGRAPH = "subgraph";
 constexpr auto KWD_GRAPH = "graph";
 
 // technically, these vars aren't constants, but they act like constants because they are set once at program start

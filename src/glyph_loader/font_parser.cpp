@@ -11,7 +11,6 @@
 
 #include <fstream>
 #include <string>
-#include <iterator>
 #include <stdexcept>
 #include <cassert>
 #include <ranges>

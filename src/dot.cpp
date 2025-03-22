@@ -12,7 +12,7 @@ float BUBBLE_ORDERING_CROSSOVER_COUNT_WEIGHT = 1.0f;
 float BUBBLE_ORDERING_DX_WEIGHT = 1.0f;
 ssize_t BUBBLE_ORDERING_MAX_ITERS = 100;
 
-void Digraph::preprocess(render::glyph::GlyphLoader &glyph_loader) {
+void Digraph::preprocess(render::glyph::GlyphLoader &glyph_loader, const size_t graph_x, const size_t graph_y) {
     if (m_nodes.empty()) {
         return;
     }
@@ -33,7 +33,7 @@ void Digraph::preprocess(render::glyph::GlyphLoader &glyph_loader) {
     populateIngoingNodesVectors();
     // compute graph layout
     computeNodeLayouts(glyph_loader);
-    computeGraphLayout();
+    computeGraphLayout(glyph_loader, graph_x, graph_y);
     computeEdgeLayout();
     computeEdgeLabelLayouts(glyph_loader);
 }

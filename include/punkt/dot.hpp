@@ -75,8 +75,10 @@ struct RankRenderAttrs {
 };
 
 struct DigraphRenderAttrs {
-    size_t m_rank_sep{}, m_node_sep{}, m_graph_width{}, m_graph_height{};
+    size_t m_rank_sep{}, m_node_sep{}, m_graph_width{}, m_graph_height{}, m_graph_x{}, m_graph_y{},
+            m_border_thickness{};
     std::vector<RankRenderAttrs> m_rank_render_attrs;
+    std::vector<GlyphQuad> m_label_quads;
 };
 
 struct Digraph;
@@ -126,7 +128,7 @@ struct Digraph {
 
     explicit Digraph(std::string_view source);
 
-    void preprocess(render::glyph::GlyphLoader &glyph_loader);
+    void preprocess(render::glyph::GlyphLoader &glyph_loader, size_t graph_x = 0, size_t graph_y = 0);
 
     void computeRanks();
 
@@ -140,7 +142,7 @@ struct Digraph {
 
     void computeNodeLayouts(const render::glyph::GlyphLoader &glyph_loader);
 
-    void computeGraphLayout();
+    void computeGraphLayout(const render::glyph::GlyphLoader &glyph_loader, size_t graph_x, size_t graph_y);
 
     void computeEdgeLayout();
 

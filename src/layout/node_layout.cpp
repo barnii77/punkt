@@ -8,7 +8,6 @@
 #include <cassert>
 #include <cmath>
 
-constexpr size_t default_font_size = 14;
 constexpr size_t min_padding = 4; // pixels
 
 using namespace punkt;
@@ -62,13 +61,13 @@ void Node::populateRenderInfo(const render::glyph::GlyphLoader &glyph_loader) {
     }
     // how much to adjust the width and height by based on border thickness.
     // TODO adjust for other shapes
-    const auto border_thickness_border_adjustment = 2 * border_thickness;
+    const auto border_thickness_size_adjustment = 2 * border_thickness;
 
     // add padding around the text
     m_render_attrs.m_width = static_cast<size_t>(std::round(static_cast<float>(max_line_width) * (1.0f + margin))) +
-                             border_thickness_border_adjustment;
+                             border_thickness_size_adjustment;
     m_render_attrs.m_height = static_cast<size_t>(std::round(static_cast<float>(y) * (1.0f + margin))) +
-                              border_thickness_border_adjustment;
+                              border_thickness_size_adjustment;
     m_render_attrs.m_border_thickness = border_thickness;
 
     size_t offset_x = (m_render_attrs.m_width - max_line_width) / 2;

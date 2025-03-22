@@ -1,0 +1,22 @@
+digraph G {
+    // Declare nodes (order in source is not necessarily preserved, but ranks will be computed)
+    node [shape=ellipse, fillcolor=red];
+    edge [headlabel="HI!", label="HO!", taillabel="HA?", fontsize=5];
+    AXYZ; B; C;
+    D; E; F;
+    G; H; I;
+    J;
+    // Edges:
+    A -> D;
+    B -> D;
+    C -> E;
+    A -> F;
+    D -> G;
+    E -> G;
+    D -> H;
+    B -> I;
+    F -> I;
+    G -> J;
+    H -> J;
+    F -> G;
+}

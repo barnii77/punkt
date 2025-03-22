@@ -28,7 +28,7 @@ static void emplaceEdgeWithRankDiff(const Digraph &dg, Edge &edge, const Node &n
                                     std::vector<std::reference_wrapper<Edge> > &edges) {
     if (const Node &other_node = getOtherNode(dg, edge, node.m_name);
         static_cast<ssize_t>(other_node.m_render_attrs.m_rank) - static_cast<ssize_t>(node.m_render_attrs.m_rank) ==
-        expected_rank_diff) {
+        expected_rank_diff && edge.m_render_attrs.m_is_visible) {
         edges.emplace_back(edge);
     }
 }

@@ -42,10 +42,10 @@ CharQuadInstanceTracker::CharQuadInstanceTracker(const size_t width, const size_
     : m_quad(0, 0, width, height) {
 }
 
-NodeQuadInfo::NodeQuadInfo(const GLuint top_left_x, const GLuint top_left_y, const GLuint fill_color,
-                           const GLuint border_color, const GLuint shape_id, const GLuint border_thickness,
-                           const GLuint width,
-                           const GLuint height)
+ShapeQuadInfo::ShapeQuadInfo(const GLuint top_left_x, const GLuint top_left_y, const GLuint fill_color,
+                             const GLuint border_color, const GLuint shape_id, const GLuint border_thickness,
+                             const GLuint width,
+                             const GLuint height)
     : m_top_left_x(top_left_x), m_top_left_y(top_left_y), m_width(width), m_height(height), m_fill_color(fill_color),
       m_border_color(border_color), m_shape_id(shape_id), m_border_thickness(border_thickness) {
 }
@@ -71,7 +71,7 @@ EdgeArrowTriangle::EdgeArrowTriangle(const std::span<const Vector2<double>> poin
     }
 }
 
-static VAO moveNodeQuadsToBuffer(const std::span<const NodeQuadInfo> quad_info) {
+static VAO moveShapeQuadsToBuffer(const std::span<const ShapeQuadInfo> quad_info) {
     GLuint vao, vbo_fake_vertex, vbo_instance;
     GL_CHECK(glGenVertexArrays(1, &vao));
     GL_CHECK(glGenBuffers(1, &vbo_fake_vertex));
@@ -85,37 +85,37 @@ static VAO moveNodeQuadsToBuffer(const std::span<const NodeQuadInfo> quad_info) 
 
     // per-quad info, stuff like quad top left, node shape id, etc.
     GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, vbo_instance));
-    GL_CHECK(glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizei>(quad_info.size() * sizeof(NodeQuadInfo)),
+    GL_CHECK(glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizei>(quad_info.size() * sizeof(ShapeQuadInfo)),
         quad_info.data(), GL_STATIC_DRAW));
 
     GL_CHECK(glEnableVertexAttribArray(0));
     GL_CHECK(glVertexAttribPointer(0, 2, GL_UNSIGNED_INT, GL_FALSE,
-        static_cast<GLsizei>(sizeof(NodeQuadInfo)), static_cast<void *>(nullptr)));
+        static_cast<GLsizei>(sizeof(ShapeQuadInfo)), static_cast<void *>(nullptr)));
     GL_CHECK(glVertexAttribDivisor(0, 1));
 
     GL_CHECK(glEnableVertexAttribArray(1));
     GL_CHECK(glVertexAttribPointer(1, 2, GL_UNSIGNED_INT, GL_FALSE,
-        static_cast<GLsizei>(sizeof(NodeQuadInfo)), reinterpret_cast<void *>(2 * sizeof(GLuint))));
+        static_cast<GLsizei>(sizeof(ShapeQuadInfo)), reinterpret_cast<void *>(2 * sizeof(GLuint))));
     GL_CHECK(glVertexAttribDivisor(1, 1));
 
     GL_CHECK(glEnableVertexAttribArray(2));
     GL_CHECK(glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT,
-        static_cast<GLsizei>(sizeof(NodeQuadInfo)), reinterpret_cast<void *>(4 * sizeof(GLuint))));
+        static_cast<GLsizei>(sizeof(ShapeQuadInfo)), reinterpret_cast<void *>(4 * sizeof(GLuint))));
     GL_CHECK(glVertexAttribDivisor(2, 1));
 
     GL_CHECK(glEnableVertexAttribArray(3));
     GL_CHECK(glVertexAttribIPointer(3, 1, GL_UNSIGNED_INT,
-        static_cast<GLsizei>(sizeof(NodeQuadInfo)), reinterpret_cast<void *>(5 * sizeof(GLuint))));
+        static_cast<GLsizei>(sizeof(ShapeQuadInfo)), reinterpret_cast<void *>(5 * sizeof(GLuint))));
     GL_CHECK(glVertexAttribDivisor(3, 1));
 
     GL_CHECK(glEnableVertexAttribArray(4));
     GL_CHECK(glVertexAttribIPointer(4, 1, GL_UNSIGNED_INT,
-        static_cast<GLsizei>(sizeof(NodeQuadInfo)), reinterpret_cast<void *>(6 * sizeof(GLuint))));
+        static_cast<GLsizei>(sizeof(ShapeQuadInfo)), reinterpret_cast<void *>(6 * sizeof(GLuint))));
     GL_CHECK(glVertexAttribDivisor(4, 1));
 
     GL_CHECK(glEnableVertexAttribArray(5));
     GL_CHECK(glVertexAttribIPointer(5, 1, GL_UNSIGNED_INT,
-        static_cast<GLsizei>(sizeof(NodeQuadInfo)), reinterpret_cast<void *>(7 * sizeof(GLuint))));
+        static_cast<GLsizei>(sizeof(ShapeQuadInfo)), reinterpret_cast<void *>(7 * sizeof(GLuint))));
     GL_CHECK(glVertexAttribDivisor(5, 1));
 
     glBindVertexArray(0);
@@ -312,15 +312,19 @@ static GLuint getPackedColorFromAttrs(const punkt::Attrs &attrs, const std::stri
     return (static_cast<GLuint>(r) << 0) | (static_cast<GLuint>(g) << 8) | (static_cast<GLuint>(b) << 16);
 }
 
+constexpr GLuint node_shape_none = 1;
+constexpr GLuint node_shape_box = 1;
+constexpr GLuint node_shape_ellipse = 1;
+
 // used in the fragment shader for identifying how to draw the border
 static GLuint getNodeShapeId(const punkt::Node &node) {
     // TODO handle more shapes
     if (const std::string_view &shape = getAttrOrDefault(node.m_attrs, "shape", default_shape); shape == "none") {
-        return 0;
+        return node_shape_none;
     } else if (shape == "box" || shape == "rect") {
-        return 1;
+        return node_shape_box;
     } else if (shape == "ellipse") {
-        return 2;
+        return node_shape_ellipse;
     } else {
         throw punkt::IllegalAttributeException("shape", std::string(shape));
     }
@@ -346,7 +350,7 @@ static void populateRendererCharQuads(const std::vector<punkt::GlyphQuad> &quads
 }
 
 GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
-    : m_dg(dg), m_glyph_loader(glyph_loader), m_zoom(1.0f) {
+    : m_dg(dg), m_glyph_loader(glyph_loader), m_zoom(1.0f), m_digraph_quad(0, 0, 0, 0, 0, 0, 0, 0) {
     GLint viewport[4]{};
     GL_CHECK(glGetIntegerv(GL_VIEWPORT, viewport));
     const GLint vw = viewport[2] - viewport[0], vh = viewport[3] - viewport[1];
@@ -367,9 +371,29 @@ GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
     GL_CHECK(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
     // populate m_char_quads, an opengl-friendly quad collection for instanced rendering, and m_node_quads
+    constexpr std::string_view font_color_attr = "fontcolor";
+    constexpr std::string_view default_font_color = "black";
+
+    // populate the main digraph quad (border and digraph fill color)
+    {
+        const GLuint font_color = getPackedColorFromAttrs(dg.m_attrs, font_color_attr, default_font_color);
+        const GLuint fill_color = getPackedColorFromAttrs(dg.m_attrs, "fillcolor", "white");
+        const GLuint border_color = getPackedColorFromAttrs(dg.m_attrs, "color", "black");
+
+        // build graph quad (for fill and border)
+        m_digraph_quad = ShapeQuadInfo(static_cast<GLuint>(dg.m_render_attrs.m_graph_x),
+                                       static_cast<GLuint>(dg.m_render_attrs.m_graph_y), fill_color, border_color,
+                                       node_shape_box, static_cast<GLuint>(dg.m_render_attrs.m_border_thickness),
+                                       static_cast<GLuint>(dg.m_render_attrs.m_graph_width),
+                                       static_cast<GLuint>(dg.m_render_attrs.m_graph_height));
+
+        populateRendererCharQuads(dg.m_render_attrs.m_label_quads, dg.m_render_attrs.m_graph_x,
+                                  dg.m_render_attrs.m_graph_y, font_color, m_char_quads);
+    }
+
+    // TODO populate subgraph quads
+
     for (const Node &node: std::views::values(dg.m_nodes)) {
-        constexpr std::string_view font_color_attr = "fontcolor";
-        constexpr std::string_view default_font_color = "black";
         GLuint font_color = getPackedColorFromAttrs(node.m_attrs, font_color_attr, default_font_color);
         const GLuint fill_color = getPackedColorFromAttrs(node.m_attrs, "fillcolor", "white");
         const GLuint border_color = getPackedColorFromAttrs(node.m_attrs, "color", "black");
@@ -417,7 +441,9 @@ GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
     }
 
     // populate node quad opengl buffers with node quads
-    m_node_quad_buffer = moveNodeQuadsToBuffer(m_node_quads);
+    m_digraph_quad_buffer = moveShapeQuadsToBuffer(std::array<ShapeQuadInfo, 1>({m_digraph_quad}));
+    m_cluster_quads_buffer = moveShapeQuadsToBuffer(m_cluster_quads);
+    m_node_quad_buffer = moveShapeQuadsToBuffer(m_node_quads);
     m_edge_lines_buffer = moveEdgeLinesToBuffer(m_edge_line_points);
     m_arrow_triangles_buffer = moveArrowTrianglesToBuffer(m_edge_arrow_triangles);
 

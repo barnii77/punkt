@@ -1,0 +1,41 @@
+digraph G {
+    // define graph quad
+    label="MIGHTY DIGRAPH";
+    pad=0.2;
+    labelloc=B;
+    penwidth=5.0;
+    fillcolor=grey;
+    fontcolor=red;
+    color=blue;
+
+    rankdir=TB;
+    ranksep=75;
+    nodesep=50;
+
+    subgraph S1 {
+        node [color=white];
+        A [label="Node A\nFirst rank", fontsize=12]
+        B [label="Node B\nFirst rank too"]
+        C [label="This is\nNode C\nSecond rank"]
+    }
+    D [label="D in\nsecond rank", color=green];
+    subgraph {
+        node [penwidth=2];
+        E [label="E in third rank"];
+    }
+    F [label="F also\nin third rank", fillcolor=red];
+    G [label="G in fourth", shape=ellipse, penwidth=5.0];
+
+    A -> C [label="E1"];
+    subgraph thick {
+        edge [penwidth=3, arrowsize=3];
+        A -> D;
+        B -> C [headlabel="E3"];
+        B -> D;
+    }
+    C -> E [taillabel="E5", label="E5"];
+    D -> F;
+    E -> G;
+    F -> G;
+    A -> G [headlabel="E42", label="E42", taillabel="E42", fontsize=7];
+}

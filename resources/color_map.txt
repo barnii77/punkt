@@ -3,3 +3,5 @@ red: #FF0000
 green: #00FF00
 blue: #0000FF
 white: #FFFFFF
+grey: #7F7F7F
+gray: #7F7F7F

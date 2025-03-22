@@ -20,41 +20,19 @@ void main() {
 
     #pragma unroll
     for (int i = 0; i < 4; i++) {
-        vec2 vertex = gs_in[0].vertices[i];
-        vec2 direction;
-
         // figure out the "thickness direction", i.e. rot90(line_direction)
-        if (i == 0) {
-            // The first pair of vertices always has to be emitted because the "skip if vertex equals prev" logic
-            // assumes the prev has already been inserted. We therefore search for the next vertex that is not
-            // in the same place (and would therefore lead to divide by zero in the normalize call).
-            vec2 next_vertex;
-            #pragma unroll
-            for (int j = 1; j < 4; j++) {
-                next_vertex = gs_in[0].vertices[++j];
-                if (next_vertex != vertex) {
-                    break;
-                }
-            }
-            if (next_vertex == vertex) {
-                EndPrimitive();
-                return;
-            }
-            direction = normalize(next_vertex - vertex);
-        } else {
-            vec2 prev_vertex = gs_in[0].vertices[i - 1];
-            // skip if the prev node is in the same location (happens very frequently)
-            if (prev_vertex == vertex) {
-                continue;
-            }
-            direction = normalize(vertex - prev_vertex);
+        vec2 line_direction = normalize(gs_in[0].vertices[2] - gs_in[0].vertices[1]);
+        vec2 thickness_direction = clockwiseRot90(line_direction);
+        if (i == 0 || i == 3) {
+            // the first and last point are straight down lines, only [1] -> [2] is sideways
+            thickness_direction.y = 0.0f;
         }
 
-        vec2 thickness_direction = clockwiseRot90(direction);
+        vec2 vertex = gs_in[0].vertices[i];
 
         #pragma unroll
         for (int j = 0; j < 2; j++) {
-            vec2 position = vertex + (j == 0 ? thickness_left : thickness_right) * thickness_direction;
+            vec2 position = vertex + (j == 0 ? -thickness_left : thickness_right) * thickness_direction;
             vec2 position_uv = (position - camera_pos) / viewport_size;
             vec2 screen_ndc = zoom * (2.0f * position_uv - 1.0f);
             screen_ndc.y = -screen_ndc.y;

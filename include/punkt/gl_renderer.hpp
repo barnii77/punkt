@@ -29,7 +29,7 @@ struct CharQuadInstanceTracker {
     CharQuadInstanceTracker(size_t width, size_t height);
 };
 
-struct NodeQuadInfo {
+struct ShapeQuadInfo {
     GLuint m_top_left_x;
     GLuint m_top_left_y;
     GLuint m_width;
@@ -39,8 +39,8 @@ struct NodeQuadInfo {
     GLuint m_shape_id;
     GLuint m_border_thickness;
 
-    NodeQuadInfo(GLuint top_left_x, GLuint top_left_y, GLuint fill_color, GLuint border_color,
-                 GLuint shape_id, GLuint border_thickness, GLuint width, GLuint height);
+    ShapeQuadInfo(GLuint top_left_x, GLuint top_left_y, GLuint fill_color, GLuint border_color,
+                  GLuint shape_id, GLuint border_thickness, GLuint width, GLuint height);
 };
 
 struct EdgeLinePoints {
@@ -68,11 +68,14 @@ struct GLRenderer {
     size_t m_viewport_w{}, m_viewport_h{};
     double m_camera_x{}, m_camera_y{};
     std::unordered_map<glyph::GlyphCharInfo, CharQuadInstanceTracker, glyph::GlyphCharInfoHasher> m_char_quads;
-    std::vector<NodeQuadInfo> m_node_quads;
+    ShapeQuadInfo m_digraph_quad;
+    std::vector<ShapeQuadInfo> m_cluster_quads;
+    std::vector<ShapeQuadInfo> m_node_quads;
     std::vector<EdgeLinePoints> m_edge_line_points;
     std::vector<EdgeArrowTriangle> m_edge_arrow_triangles;
     // opengl buffers
-    VAO m_node_quad_buffer{}, m_edge_lines_buffer{}, m_arrow_triangles_buffer{};
+    VAO m_node_quad_buffer{}, m_digraph_quad_buffer{}, m_cluster_quads_buffer{}, m_edge_lines_buffer{},
+            m_arrow_triangles_buffer{};
     std::unordered_map<glyph::GlyphCharInfo, VAO, glyph::GlyphCharInfoHasher> m_char_buffers;
     GLuint m_nodes_shader{}, m_chars_shader{}, m_edges_shader{}, m_arrows_shader{};
 
