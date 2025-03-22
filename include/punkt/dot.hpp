@@ -115,6 +115,7 @@ struct Digraph {
     std::vector<size_t> m_rank_counts;
     std::vector<std::vector<std::string_view> > m_per_rank_orderings;
     std::vector<std::unordered_map<std::string_view, size_t> > m_per_rank_orderings_index;
+    std::vector<std::tuple<std::string_view, std::vector<std::string_view>>> m_rank_constraints;
     size_t m_n_ghost_nodes{};
     // graph attrs also exist. They store attributes like ranksep, nodesep, etc.
     Attrs m_attrs;

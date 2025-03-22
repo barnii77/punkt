@@ -47,7 +47,6 @@ int main() {
 
 ////////////////////// TODOS //////////////////////
 
-// TODO handle `{rank=same; A B C;}` constraint blocks
 // TODO handle spline edges
 // TODO make the glyph loader LRU style throw out (and delete) textures when a texture limit is reached
 // TODO I have node order computation kinda working, so now, when I have graph layout computation, I should decide

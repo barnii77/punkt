@@ -102,3 +102,50 @@ TEST(preprocessing, CyclicGraph) {
         }
     }
 }
+
+TEST(preprocessing, ConstrainedRankAssignment) {
+    // Define a DAG in DOT language.
+    constexpr std::string_view dot_source = R"(
+        digraph DAG {
+            X; A; B; C; D; E; F;
+            {rank=same; A B C;}
+            {rank=min; X;}
+            {rank=max; F;}
+            X -> B;
+            A -> B; A -> C;
+            B -> D;
+            C -> D;
+            D -> E;
+            F -> E;
+        }
+    )";
+
+    // Parse the DOT source into a Digraph.
+    Digraph dg(dot_source);
+
+    // Run the preprocessing step, which computes node ranks.
+    render::glyph::GlyphLoader glyph_loader;
+    dg.populateIngoingNodesVectors();
+    dg.computeRanks();
+    // dg.preprocess(glyph_loader);
+
+    // Expected ranks for each node.
+    std::unordered_map<std::string_view, size_t> expectedRanks{
+        {"X", 0},
+        {"A", 1},
+        {"B", 1},
+        {"C", 1},
+        {"D", 2},
+        {"E", 3},
+        {"F", 4},
+    };
+
+    // Verify that each node has the expected rank.
+    for (const auto &[nodeName, expectedRank]: expectedRanks) {
+        ASSERT_TRUE(dg.m_nodes.contains(nodeName)) << "Node " << nodeName << " is missing.";
+        const Node &node = dg.m_nodes.at(nodeName);
+        EXPECT_EQ(node.m_render_attrs.m_rank, expectedRank)
+            << "Node " << nodeName << " has rank " << node.m_render_attrs.m_rank
+            << " but expected " << expectedRank;
+    }
+}

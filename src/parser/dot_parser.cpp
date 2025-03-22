@@ -1,5 +1,6 @@
 #include "punkt/dot.hpp"
 #include "punkt/dot_tokenizer.hpp"
+#include "punkt/utils.hpp"
 #include "punkt/dot_constants.hpp"
 #include "punkt/int_types.hpp"
 
@@ -155,7 +156,9 @@ static std::string_view consumeGraphSourceAndUpdateDigraph(Digraph &dg, std::spa
 
 static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::Token> &tokens) {
     assert(!tokens.empty());
-    static std::array expected_token_types = {tokenizer::Token::Type::string, tokenizer::Token::Type::kwd};
+    static std::array expected_token_types = {
+        tokenizer::Token::Type::string, tokenizer::Token::Type::kwd, tokenizer::Token::Type::lcurly
+    };
     std::span<tokenizer::Token> unconsumed_tokens = tokens;
 
     if (tokenizer::Token a = expectAndConsumeOneOf(tokens, expected_token_types);
@@ -186,6 +189,31 @@ static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::T
         } else {
             throw UnexpectedTokenException(a);
         }
+    } else if (a.m_type == tokenizer::Token::Type::lcurly) {
+        // constraint, e.g. `{ rank=min; A B C; }`
+        expectAndConsume(tokens, tokenizer::Token::Type::string, "rank");
+        expectAndConsume(tokens, tokenizer::Token::Type::equals);
+        const tokenizer::Token ty = expectAndConsume(tokens, tokenizer::Token::Type::string);
+        if (ty.m_value != "min" && ty.m_value != "max" && ty.m_value != "same" && ty.m_value != "sink" &&
+            ty.m_value != "source") {
+            throw UnexpectedTokenException(ty);
+        }
+        std::vector<std::string_view> constrained_nodes;
+        expectAndConsume(tokens, tokenizer::Token::Type::semicolon);
+        while (!nextTokenIs(tokens, tokenizer::Token::Type::semicolon)) {
+            constrained_nodes.emplace_back(expectAndConsume(tokens, tokenizer::Token::Type::string).m_value);
+        }
+        expectAndConsume(tokens, tokenizer::Token::Type::semicolon);
+        expectAndConsume(tokens, tokenizer::Token::Type::rcurly);
+        for (const auto &node_name: constrained_nodes) {
+            implicitCreateNodeIfNotExists(dg, node_name, dg.m_default_node_attrs);
+            Node &node = dg.m_nodes.at(node_name);
+            std::string constraints = std::string(getAttrOrDefault(node.m_attrs, "@constraints", "")) +
+                                      std::to_string(dg.m_rank_constraints.size()) + ";";
+            dg.m_generated_sources.emplace_front(std::move(constraints));
+            node.m_attrs.insert_or_assign("@constraints", dg.m_generated_sources.front());
+        }
+        dg.m_rank_constraints.emplace_back(ty.m_value, std::move(constrained_nodes));
     } else if (nextTokenIs(tokens, tokenizer::Token::Type::arrow)) {
         validateNodeName(a.m_value);
         // handle edge declaration(s)
