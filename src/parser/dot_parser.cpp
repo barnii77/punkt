@@ -151,7 +151,7 @@ static void validateAttrs(const Attrs &attrs) {
     }
 }
 
-static std::string consumeGraphSourceAndUpdateDigraph(Digraph &dg, std::span<tokenizer::Token> &tokens);
+static std::string_view consumeGraphSourceAndUpdateDigraph(Digraph &dg, std::span<tokenizer::Token> &tokens);
 
 static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::Token> &tokens) {
     assert(!tokens.empty());
@@ -233,12 +233,12 @@ static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::T
     }
 }
 
-static std::string consumeGraphSourceAndUpdateDigraph(Digraph &dg, std::span<tokenizer::Token> &tokens) {
+static std::string_view consumeGraphSourceAndUpdateDigraph(Digraph &dg, std::span<tokenizer::Token> &tokens) {
     if (const auto tok = expectAndConsume(tokens, tokenizer::Token::Type::kwd);
         tok.m_value != KWD_DIGRAPH && tok.m_value != KWD_SUBGRAPH && tok.m_value != KWD_GRAPH) {
         throw UnexpectedTokenException(tok);
     }
-    std::string name;
+    std::string_view name;
     if (nextTokenIs(tokens, tokenizer::Token::Type::string)) {
         name = expectAndConsume(tokens, tokenizer::Token::Type::string).m_value;
     }
@@ -261,7 +261,7 @@ Digraph::Digraph(std::string source)
     : m_source(std::move(source)) {
     std::vector<tokenizer::Token> tokens_vec = tokenizer::tokenize(*this, m_source);
     std::span tokens = tokens_vec;
-    consumeGraphSourceAndUpdateDigraph(*this, tokens);
+    m_name = consumeGraphSourceAndUpdateDigraph(*this, tokens);
 }
 
 Digraph::Digraph(const std::string_view source)

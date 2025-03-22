@@ -43,9 +43,11 @@ void Digraph::computeGraphLayout(const render::glyph::GlyphLoader &glyph_loader,
     const TextAlignment label_ta =
             getAttrTransformedOrDefault(m_attrs, "labeljust", default_label_just, textAlignmentFromStr);
     const std::string_view label_loc = getAttrOrDefault(m_attrs, "labelloc", "T");
-    const float graph_border_padding = getAttrTransformedCheckedOrDefault(m_attrs, "pad", 0.11f, stringViewToFloat);
-    const float graph_border_pen_width = getAttrTransformedCheckedOrDefault(
-        m_attrs, "penwidth", 1.0f, stringViewToFloat);
+
+    // graphs by default don't have padding and a margin
+    const float graph_border_padding = getAttrTransformedCheckedOrDefault(m_attrs, "pad", 0.0f, stringViewToFloat);
+    const float graph_border_pen_width = getAttrTransformedCheckedOrDefault(m_attrs, "penwidth", 0.0f, stringViewToFloat);
+
     constexpr size_t dpi = DEFAULT_DPI; // TODO handle custom DPI settings
     m_render_attrs.m_border_thickness = static_cast<size_t>(
         graph_border_pen_width * static_cast<float>(dpi) / static_cast<float>(DEFAULT_DPI));
@@ -53,7 +55,7 @@ void Digraph::computeGraphLayout(const render::glyph::GlyphLoader &glyph_loader,
     size_t graph_label_width = 0, graph_label_height = 0, graph_body_start = 0, graph_label_y = 0;
     populateGraphLabelText(m_attrs, label_ta, glyph_loader, m_render_attrs.m_label_quads, graph_label_width,
                            graph_label_height);
-    if (caseInsensitiveEquals(label_loc, "T") || caseInsensitiveEquals(label_loc, "L") && graph_label_height > 0) {
+    if ((caseInsensitiveEquals(label_loc, "T") || caseInsensitiveEquals(label_loc, "L")) && graph_label_height > 0) {
         graph_body_start += graph_label_height + m_render_attrs.m_rank_sep;
     }
 
@@ -86,7 +88,7 @@ void Digraph::computeGraphLayout(const render::glyph::GlyphLoader &glyph_loader,
     }
 
     // compute graph dimensions
-    if (caseInsensitiveEquals(label_loc, "B") || caseInsensitiveEquals(label_loc, "R") && graph_label_height > 0) {
+    if ((caseInsensitiveEquals(label_loc, "B") || caseInsensitiveEquals(label_loc, "R")) && graph_label_height > 0) {
         graph_label_y = y;
         y += m_render_attrs.m_rank_sep + graph_label_height;
     }

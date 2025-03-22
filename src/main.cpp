@@ -40,13 +40,15 @@ static std::string readInputFile(const char *path) {
 }
 
 int main() {
-    const std::string test_input = readInputFile("examples/demo5.dot");
+    const std::string test_input = readInputFile("examples/demo2.dot");
     const auto font_path = "resources/fonts/tinyfont.psf";
     punktRun(test_input.data(), font_path);
 }
 
 ////////////////////// TODOS //////////////////////
 
+// TODO adapt the GLRenderer so that I can use it for clusters, i.e. with multiple digraphs at once
+// TODO handle shape=circle
 // TODO I should actually probably be zooming in towards where the mouse is, not the center of the screen
 // TODO handle spline edges
 // TODO handle `{rank=same; A B C;}` constraint blocks

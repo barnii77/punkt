@@ -312,9 +312,9 @@ static GLuint getPackedColorFromAttrs(const punkt::Attrs &attrs, const std::stri
     return (static_cast<GLuint>(r) << 0) | (static_cast<GLuint>(g) << 8) | (static_cast<GLuint>(b) << 16);
 }
 
-constexpr GLuint node_shape_none = 1;
+constexpr GLuint node_shape_none = 0;
 constexpr GLuint node_shape_box = 1;
-constexpr GLuint node_shape_ellipse = 1;
+constexpr GLuint node_shape_ellipse = 2;
 
 // used in the fragment shader for identifying how to draw the border
 static GLuint getNodeShapeId(const punkt::Node &node) {
@@ -391,7 +391,7 @@ GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
                                   dg.m_render_attrs.m_graph_y, font_color, m_char_quads);
     }
 
-    // TODO populate subgraph quads
+    // TODO populate cluster quads
 
     for (const Node &node: std::views::values(dg.m_nodes)) {
         GLuint font_color = getPackedColorFromAttrs(node.m_attrs, font_color_attr, default_font_color);
