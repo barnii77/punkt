@@ -2,6 +2,7 @@
 
 #include "punkt/dot_tokenizer.hpp"
 #include "punkt/glyph_loader/glyph_loader.hpp"
+#include "punkt/int_types.hpp"
 
 #include <string>
 #include <forward_list>

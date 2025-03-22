@@ -1,28 +1,16 @@
 #include "punkt/dot.hpp"
 #include "punkt/dot_constants.hpp"
 #include "punkt/int_types.hpp"
+#include "punkt/utils.hpp"
 
 #include <cassert>
 #include <vector>
 #include <ranges>
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <numeric>
 #include <string_view>
-
-// TODO at some point I could implement this (if I find a case where the current method is not sufficient):
-// try to produce good solutions through evolution on the graphs where the inverse fitness function is my
-// score, and you have a pool of graphs of size `N` (constant size) that are evolved in outer and inner steps:
-// Each outer step (evolution step) you combine the previous evolution step graphs and the new ones into one pool,
-// pick the top `T` graphs out of there and put them into the next step pool (so that the top few graphs always survive).
-// Then, you find the max score, invert all scores around that (i.e. score_inv = max_score - score) and then use those
-// as relative weights for reproduction. You then fill up the pool to max size by sampling randomly with those weights.
-// You repeat the above for `E` (epochs) steps.
-// Now, how does the inner step work? Each inner step will perform `I` random swaps in random ranks (i.e. random
-// mutations).
-// For initialization, we start with `N` randomly permuted graphs to get lots of genetic diversity in the beginning.
-// Except they won't be completely random. I will actually throw the randomly permuted graphs into a barycenter algo
-// first, which is what graphviz does, and that way I hope to produce reasonable starting points.
 
 using namespace punkt;
 
@@ -65,6 +53,8 @@ struct ConnectionMat {
     void swapNodes(size_t a, size_t b, bool is_column_swap);
 };
 
+static std::unordered_map<uintptr_t, size_t> g_edge_weight_attribute_cache;
+
 struct IntersectionMat {
     std::vector<size_t> m_data;
     size_t m_w{}, m_h{};
@@ -97,9 +87,13 @@ void ConnectionMat::populate(const Digraph &dg, const size_t rank) {
                     const size_t source_idx = dg.m_per_rank_orderings_index.at(rank).at(edge.m_source);
                     const size_t dest_idx = dg.m_per_rank_orderings_index.at(rank + 1).at(edge.m_dest);
                     assert(source_idx < h && dest_idx < w);
-                    // TODO make this `+= 1` instead of `= 1` to make this account for multiple edges between two nodes
-                    // TODO making this `+= 1` will require changes elsewhere
-                    m_data.at(source_idx * w + dest_idx) = 1;
+                    const auto edge_ptr = reinterpret_cast<uintptr_t>(&edge);
+                    if (!g_edge_weight_attribute_cache.contains(edge_ptr)) {
+                        const bool constraint = getAttrOrDefault(edge.m_attrs, "constraint", "true") == "true";
+                        g_edge_weight_attribute_cache[edge_ptr] = getAttrTransformedCheckedOrDefault(
+                            edge.m_attrs, "weight", constraint ? 1 : 0, stringViewToSizeT);
+                    }
+                    m_data.at(source_idx * w + dest_idx) += g_edge_weight_attribute_cache.at(edge_ptr);
                 }
             }
         }
@@ -182,10 +176,10 @@ static size_t reduceSum(const size_t *in, const size_t stride, const size_t n) {
     return s;
 }
 
-static float medianBarycenterX(const float *barycenters, const size_t *in, const size_t stride, const size_t n,
+static float medianBarycenterX(const float *barycenters, const size_t *conns, const size_t stride, const size_t n,
                                const float default_value) {
     assert(n > 0);
-    const size_t n_elems = reduceSum(in, stride, n);
+    const size_t n_elems = reduceSum(conns, stride, n);
     if (n_elems == 0) {
         return default_value;
     }
@@ -193,19 +187,18 @@ static float medianBarycenterX(const float *barycenters, const size_t *in, const
     size_t i = 0;
     for (size_t n_ones_encountered = 0; n_ones_encountered < median_idx; i++) {
         assert(i < n);
-        const size_t value = in[i * stride];
-        assert(value < 2);
+        const size_t value = conns[i * stride];
         n_ones_encountered += value;
     }
     assert(i > 0);
     float median = barycenters[--i];
     if (n_elems % 2 == 0) {
         // we need to average
-        while (in[i * stride] == 0) {
+        while (conns[i * stride] == 0) {
             assert(i < n);
             i++;
         }
-        assert(in[i * stride] == 1);
+        assert(conns[i * stride]);
         median = (median + barycenters[i]) / 2;
     }
     return median;
@@ -487,6 +480,15 @@ static void barycenterSweep(Digraph &dg, const bool is_downward_sweep, bool &imp
 }
 
 void Digraph::computeHorizontalOrderings() {
+    // clear global state - TODO refactor this - there shouldn't be global state
+    g_edge_weight_attribute_cache.clear();
+    std::memset(g_n_intersections_pr, 0, sizeof(g_n_intersections_pr));
+    std::memset(g_sum_dx_pr, 0, sizeof(g_sum_dx_pr));
+    for (size_t i = 0; i < 2; i++) {
+        g_connection_mats[i] = ConnectionMat();
+        g_intersection_mats[i] = IntersectionMat();
+    }
+
     // init with empty ordering vector for every rank
     m_per_rank_orderings.resize(m_rank_counts.size());
     m_per_rank_orderings_index.resize(m_rank_counts.size());
@@ -501,8 +503,6 @@ void Digraph::computeHorizontalOrderings() {
         }
     }
 
-    // TODO determine whether these loops should be interchanged or not, i.e. whether to do oscillating up/down sweeps
-    // or first N down sweeps followed by N up sweeps.
     for (ssize_t barycenter_iter = 0; barycenter_iter < BARYCENTER_ORDERING_MAX_ITERS_PER_DIRECTION ||
                                       BARYCENTER_ORDERING_MAX_ITERS_PER_DIRECTION < 0; barycenter_iter++) {
         for (const bool is_downward_sweep: {false, true}) {

@@ -40,16 +40,18 @@ static std::string readInputFile(const char *path) {
 }
 
 int main() {
-    const std::string test_input = readInputFile("examples/demo3.dot");
+    const std::string test_input = readInputFile("temp/test.dot");
     const auto font_path = "resources/fonts/tinyfont.psf";
     punktRun(test_input.data(), font_path);
 }
 
 ////////////////////// TODOS //////////////////////
 
-// TODO adapt the GLRenderer so that I can use it for clusters, i.e. with multiple digraphs at once
-// TODO handle spline edges
 // TODO handle `{rank=same; A B C;}` constraint blocks
+// TODO respect edge count in the edge reordering (i.e. the "+= instead of =" todo) and the weight property on edges
+    // the weight property should just be treated as if there were N edges instead of 1, i.e. trivial once the first
+    // TODO is implemented
+// TODO handle spline edges
 // TODO handle `graph [...]` similar to `edge [...]` and `node [...]`
 // TODO make the glyph loader LRU style throw out (and delete) textures when a texture limit is reached
 // TODO I have node order computation kinda working, so now, when I have graph layout computation, I should decide
@@ -59,10 +61,8 @@ int main() {
 // moving each node and if it moves left (for the left pointer) or right (for right pointer), I can make more room
 // for the next nodes and continue going inward. On the other hand, maybe I want even spacing. So maybe NOT.
 // TODO handle graph level attributes `style` and `rankdir`
-// TODO in the last example there are some (i assume size_t truncating?) imperfections where ghost edges just don't
-// match in size and it looks really bad... investigate why I saw static_cast<GLuint>(0.5) round up at some point
-    // TODO can I make ghost nodes height 0 without breaking stuff?
 // TODO handle dashed and dotted edges
+// TODO adapt the GLRenderer so that I can use it for clusters, i.e. with multiple digraphs at once
 // TODO a cluster should become a single super-node when doing all my layout computations. This means it is literally
 // treated as a single (giant) node with special attributes (@type = "cluster", @code = <string_view into the graph
 // source defining the cluster>) and assigned a single rank. Once we have computed the horizontal orderings, we convert
