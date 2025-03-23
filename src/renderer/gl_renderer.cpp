@@ -64,6 +64,12 @@ void GLRenderer::renderFrame() {
     GL_CHECK(glUniform2f(glGetUniformLocation(m_nodes_shader, "camera_pos"), static_cast<GLfloat>(m_camera_x),
         static_cast<GLfloat>(m_camera_y)));
     GL_CHECK(glUniform1f(glGetUniformLocation(m_nodes_shader, "zoom"), m_zoom));
+    GL_CHECK(
+        glUniform1i(glGetUniformLocation(m_nodes_shader, "is_reversed"), static_cast<GLint>(m_dg.m_render_attrs.
+            m_rank_dir.m_is_reversed)));
+    GL_CHECK(
+        glUniform1i(glGetUniformLocation(m_nodes_shader, "is_sideways"), static_cast<GLint>(m_dg.m_render_attrs.
+            m_rank_dir.m_is_sideways)));
 
     // graph
     GL_CHECK(glBindVertexArray(m_digraph_quad_buffer));
@@ -88,6 +94,12 @@ void GLRenderer::renderFrame() {
     GL_CHECK(glUniform2f(glGetUniformLocation(m_edges_shader, "camera_pos"), static_cast<GLfloat>(m_camera_x),
         static_cast<GLfloat>(m_camera_y)));
     GL_CHECK(glUniform1f(glGetUniformLocation(m_edges_shader, "zoom"), m_zoom));
+    GL_CHECK(
+        glUniform1i(glGetUniformLocation(m_edges_shader, "is_reversed"), static_cast<GLint>(m_dg.m_render_attrs.
+            m_rank_dir.m_is_reversed)));
+    GL_CHECK(
+        glUniform1i(glGetUniformLocation(m_edges_shader, "is_sideways"), static_cast<GLint>(m_dg.m_render_attrs.
+            m_rank_dir.m_is_sideways)));
 
     GL_CHECK(glBindVertexArray(m_edge_lines_buffer));
     GL_CHECK(glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(m_edge_line_points.size())));
@@ -103,6 +115,12 @@ void GLRenderer::renderFrame() {
     GL_CHECK(glUniform2f(glGetUniformLocation(m_arrows_shader, "camera_pos"), static_cast<GLfloat>(m_camera_x),
         static_cast<GLfloat>(m_camera_y)));
     GL_CHECK(glUniform1f(glGetUniformLocation(m_arrows_shader, "zoom"), m_zoom));
+    GL_CHECK(
+        glUniform1i(glGetUniformLocation(m_arrows_shader, "is_reversed"), static_cast<GLint>(m_dg.m_render_attrs.
+            m_rank_dir.m_is_reversed)));
+    GL_CHECK(
+        glUniform1i(glGetUniformLocation(m_arrows_shader, "is_sideways"), static_cast<GLint>(m_dg.m_render_attrs.
+            m_rank_dir.m_is_sideways)));
 
     GL_CHECK(glBindVertexArray(m_arrow_triangles_buffer));
     GL_CHECK(glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(m_edge_arrow_triangles.size())));
@@ -134,6 +152,12 @@ void GLRenderer::renderFrame() {
         static_cast<GLfloat>(m_camera_y)));
     GL_CHECK(glUniform1f(glGetUniformLocation(m_chars_shader, "zoom"), m_zoom));
     GL_CHECK(glUniform1i(glGetUniformLocation(m_chars_shader, "font_texture"), 0)); // Texture unit 0
+    GL_CHECK(
+        glUniform1i(glGetUniformLocation(m_chars_shader, "is_reversed"), static_cast<GLint>(m_dg.m_render_attrs.
+            m_rank_dir.m_is_reversed)));
+    GL_CHECK(
+        glUniform1i(glGetUniformLocation(m_chars_shader, "is_sideways"), static_cast<GLint>(m_dg.m_render_attrs.
+            m_rank_dir.m_is_sideways)));
 
     for (const auto &gci: std::views::keys(m_char_quads)) {
         const auto [c, font_size_zoomed] = transformGciForZoom(gci, m_zoom);

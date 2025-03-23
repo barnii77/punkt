@@ -22,7 +22,7 @@ TextAlignment punkt::textAlignmentFromStr(const std::string_view &s) {
 // with (0, 0) being the top left of the text bounding box
 void punkt::populateGlyphQuadsWithText(const std::string_view &text, const size_t font_size, const TextAlignment ta,
               const render::glyph::GlyphLoader &glyph_loader, std::vector<GlyphQuad> &out_quads,
-              size_t &out_max_line_width, size_t &out_height) {
+              size_t &out_max_line_width, size_t &out_height, const RankDirConfig rank_dir) {
     std::vector<size_t> quad_lines;
     quad_lines.reserve(text.length());
     out_quads.reserve(text.length());
@@ -40,8 +40,14 @@ void punkt::populateGlyphQuadsWithText(const std::string_view &text, const size_
         const render::glyph::GlyphMeta glyph = glyph_loader.getGlyphMeta(c, font_size);
         x += glyph.m_width;
         if (glyph.m_width * glyph.m_height > 0) {
-            out_quads.emplace_back(x_prev, y - font_size, x, y,
-                                   render::glyph::GlyphCharInfo(c, font_size));
+            if (rank_dir.m_is_sideways) {
+                // flip x and y
+                out_quads.emplace_back(y - font_size, x_prev, y, x,
+                                       render::glyph::GlyphCharInfo(c, font_size));
+            } else {
+                out_quads.emplace_back(x_prev, y - font_size, x, y,
+                                       render::glyph::GlyphCharInfo(c, font_size));
+            }
         }
         quad_lines.emplace_back(line);
         if (c == '\n') {
@@ -55,6 +61,7 @@ void punkt::populateGlyphQuadsWithText(const std::string_view &text, const size_
     line_widths.emplace_back(x);
 
     out_max_line_width = std::ranges::max(line_widths);
+
     // apply text alignment (left, center or right)
     if (ta != TextAlignment::left) {
         for (size_t i = 0; i < out_quads.size(); i++) {
@@ -67,8 +74,29 @@ void punkt::populateGlyphQuadsWithText(const std::string_view &text, const size_
 
             // shift horizontally
             GlyphQuad &gq = out_quads.at(i);
-            gq.m_left += adjustment;
-            gq.m_right += adjustment;
+            if (rank_dir.m_is_sideways) {
+                gq.m_top += adjustment;
+                gq.m_bottom += adjustment;
+            } else {
+                gq.m_left += adjustment;
+                gq.m_right += adjustment;
+            }
+            if (rank_dir.m_is_reversed) {
+                if (rank_dir.m_is_sideways) {
+                    const size_t left = out_max_line_width - gq.m_top, right = out_max_line_width - gq.m_bottom;
+                    gq.m_top = right;
+                    gq.m_bottom = left;
+                } else {
+                    const size_t top = out_height - gq.m_left, bottom = out_height - gq.m_right;
+                    gq.m_left = bottom;
+                    gq.m_right = top;
+                }
+            }
         }
+    }
+
+    if (rank_dir.m_is_sideways) {
+        // must swap width and height if we are rendering sideways (i.e. rankdir=LR or rankdir=RL)
+        std::swap(out_height, out_max_line_width);
     }
 }

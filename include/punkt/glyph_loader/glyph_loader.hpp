@@ -9,6 +9,8 @@
 #include <variant>
 #include <span>
 
+#include "punkt/utils.hpp"
+
 namespace punkt::render::glyph {
 struct GlyphCharInfo {
     char32_t c{};
@@ -32,6 +34,8 @@ struct Glyph {
     GlyphMeta m_meta;
 
     Glyph(GLuint texture, size_t width, size_t height);
+
+    ~Glyph();
 };
 
 enum class FontType: uint32_t {
@@ -57,7 +61,7 @@ class GlyphLoader {
     std::string m_font_path;
     std::string m_raw_font_data;
     std::unordered_map<GlyphCharInfo, GlyphMeta, GlyphCharInfoHasher> m_glyph_metas;
-    std::unordered_map<GlyphCharInfo, Glyph, GlyphCharInfoHasher> m_loaded_glyphs;
+    LRUCache<GlyphCharInfo, Glyph, GlyphCharInfoHasher> m_loaded_glyphs;
     GlyphLoaderFontDataT m_font_data;
     // used for zero-initializing textures
     std::vector<uint8_t> m_zeros_buffer;

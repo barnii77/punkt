@@ -17,6 +17,7 @@ void main() {
     // the precision that node positions are computed, otherwise we get slight misalignment that looks bad with zoom.
     float thickness_fractional = gs_in[0].edge_thickness / 2.0f;
     float thickness_left = floor(thickness_fractional), thickness_right = ceil(thickness_fractional);
+    vec2 reverse_transform = getReverseTransform();
 
     #pragma unroll
     for (int i = 0; i < 4; i++) {
@@ -32,9 +33,10 @@ void main() {
 
         #pragma unroll
         for (int j = 0; j < 2; j++) {
-            vec2 position = vertex + (j == 0 ? -thickness_left : thickness_right) * thickness_direction;
-            vec2 position_uv = (position - camera_pos) / viewport_size;
-            vec2 screen_ndc = zoom * (2.0f * position_uv - 1.0f);
+            vec2 position = getDirectionTransformedPosition(
+                vertex + (j == 0 ? -thickness_left : thickness_right) * thickness_direction);
+            vec2 position_uv = (position - reverse_transform * camera_pos) / viewport_size;
+            vec2 screen_ndc = zoom * reverse_transform * (2.0f * position_uv - 1.0f);
             screen_ndc.y = -screen_ndc.y;
 
             gl_Position = vec4(screen_ndc, 0.0f, 1.0f);

@@ -5,8 +5,18 @@
 #include <numeric>
 #include <charconv>
 #include <string>
+#include <algorithm>
+#include <cctype>
+#include <string_view>
 
 using namespace punkt;
+
+bool punkt::caseInsensitiveEquals(const std::string_view lhs, const std::string_view rhs) {
+    return std::ranges::equal(lhs, rhs, [](const unsigned char a, const unsigned char b) {
+        return std::tolower(a) == std::tolower(b);
+    });
+}
+
 
 size_t punkt::stringViewToSizeTHex(const std::string_view &sv, const std::string_view &attr_name) {
     size_t result = 0;

@@ -4,6 +4,7 @@
 #include <glad/glad.h>
 
 #include <cassert>
+#include <memory>
 #include <cmath>
 #include <span>
 
@@ -118,7 +119,7 @@ void GlyphLoader::loadRasterGlyph(const char32_t c, const size_t font_size, cons
     GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
 
     const GlyphCharInfo gci(c, font_size);
-    m_loaded_glyphs.insert_or_assign(gci, Glyph(texture, glyph_width, glyph_height));
+    m_loaded_glyphs.put(gci, std::make_unique<Glyph>(texture, glyph_width, glyph_height));
 }
 
 void GlyphLoader::loadTTFGlyph(char32_t c, size_t font_size) {

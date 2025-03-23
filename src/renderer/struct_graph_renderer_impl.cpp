@@ -14,9 +14,8 @@ static void assertNonNull(void *p) {
 GraphRenderer::GraphRenderer() = default;
 
 GraphRenderer::~GraphRenderer() {
-    if (m_graph_renderer) {
-        delete static_cast<render::GLRenderer *>(m_graph_renderer);
-    }
+    delete static_cast<render::GLRenderer *>(m_graph_renderer);
+    m_graph_renderer = nullptr;
 }
 
 void GraphRenderer::initialize(const Digraph &dg, render::glyph::GlyphLoader &glyph_loader) {

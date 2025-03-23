@@ -73,13 +73,14 @@ void Digraph::computeEdgeLabelLayouts(const render::glyph::GlyphLoader &glyph_lo
 
             if (const std::string_view &label = getAttrOrDefault(edge.m_attrs, "label", ""); !label.empty()) {
                 populateGlyphQuadsWithText(label, font_size, TextAlignment::center, glyph_loader,
-                                           edge.m_render_attrs.m_label_quads, max_line_width, height);
+                                           edge.m_render_attrs.m_label_quads, max_line_width, height,
+                                           m_render_attrs.m_rank_dir);
                 // TODO make the default value of `splines` true once they are done
                 const Vector2 center = getLineCenter(edge.m_render_attrs.m_trajectory,
                                                      getAttrOrDefault(m_attrs, "splines", "false") != "false");
                 const ssize_t x_dir_dependent_offset = destination.m_render_attrs.m_x < node.m_render_attrs.m_x
-                                                                 ? -static_cast<ssize_t>(font_size)
-                                                                 : static_cast<ssize_t>(font_size);
+                                                           ? -static_cast<ssize_t>(font_size)
+                                                           : static_cast<ssize_t>(font_size);
                 const auto top_left = Vector2(center.x + x_dir_dependent_offset,
                                               center.y - height / 2);
                 offsetQuads(edge.m_render_attrs.m_label_quads, top_left);
@@ -94,7 +95,7 @@ void Digraph::computeEdgeLabelLayouts(const render::glyph::GlyphLoader &glyph_lo
                                                               ? edge.m_render_attrs.m_head_label_quads
                                                               : edge.m_render_attrs.m_tail_label_quads;
                     populateGlyphQuadsWithText(label_value, font_size, TextAlignment::center, glyph_loader, glyph_quads,
-                                               max_line_width, height);
+                                               max_line_width, height, m_render_attrs.m_rank_dir);
                     const ssize_t rank_diff = static_cast<ssize_t>(destination.m_render_attrs.m_rank) -
                                               static_cast<ssize_t>(node.m_render_attrs.m_rank);
 
@@ -102,14 +103,14 @@ void Digraph::computeEdgeLabelLayouts(const render::glyph::GlyphLoader &glyph_lo
                     const bool get_min = label_type == "headlabel" && rank_diff == -1 ||
                                          label_type == "taillabel" && rank_diff == 1;
                     const auto [end_x, end_y] = getTrajectoryEndPoint(edge.m_render_attrs.m_trajectory, get_min);
-                    left = end_x;
-                    top = end_y;
+                    left = static_cast<ssize_t>(end_x);
+                    top = static_cast<ssize_t>(end_y);
                     if (!get_min) {
                         top -= static_cast<ssize_t>(height);
                     }
                     const ssize_t x_dir_dependent_offset = destination.m_render_attrs.m_x < node.m_render_attrs.m_x
-                                                                     ? -static_cast<ssize_t>(font_size)
-                                                                     : font_size;
+                                                               ? -static_cast<ssize_t>(font_size)
+                                                               : static_cast<ssize_t>(font_size);
                     left += x_dir_dependent_offset;
 
                     const Vector2 top_left{

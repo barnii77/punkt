@@ -145,11 +145,13 @@ void punktRun(const char *graph_source_cstr, const char *font_path_relative_to_p
                                            ? std::string_view(font_path_relative_to_project_root_cstr)
                                            : std::string_view();
     punkt::Digraph dg(graph_source);
-    punkt::render::glyph::GlyphLoader glyph_loader = font_path_relative_to_project_root_cstr
-                                                         ? punkt::render::glyph::GlyphLoader{std::string(font_path)}
-                                                         : punkt::render::glyph::GlyphLoader{};
-    dg.preprocess(glyph_loader);
-    dg.m_renderer.initialize(dg, glyph_loader);
+    punkt::render::glyph::GlyphLoader *glyph_loader = font_path_relative_to_project_root_cstr
+                                                          ? new punkt::render::glyph::GlyphLoader{
+                                                              std::string(font_path)
+                                                          }
+                                                          : new punkt::render::glyph::GlyphLoader{};
+    dg.preprocess(*glyph_loader);
+    dg.m_renderer.initialize(dg, *glyph_loader);
 #ifndef PUNKT_REMOVE_FPS_COUNTER
     fpsCounterInit();
 #endif
@@ -173,5 +175,7 @@ void punktRun(const char *graph_source_cstr, const char *font_path_relative_to_p
         fpsCounterNotifyFrameDone();
 #endif
     }
+    // must allocate with new so I can call the destructor manually before the opengl context is destroyed
+    delete glyph_loader;
     terminateGL(window);
 }

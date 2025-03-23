@@ -294,6 +294,11 @@ Digraph::Digraph(std::string source)
     std::vector<tokenizer::Token> tokens_vec = tokenizer::tokenize(*this, m_source);
     std::span tokens = tokens_vec;
     m_name = consumeGraphSourceAndUpdateDigraph(*this, tokens);
+    const std::string_view rank_dir = getAttrOrDefault(m_attrs, "rankdir", "TB");
+    m_render_attrs.m_rank_dir = RankDirConfig{
+        caseInsensitiveEquals(rank_dir, "LR") || caseInsensitiveEquals(rank_dir, "RL"),
+        caseInsensitiveEquals(rank_dir, "RL") || caseInsensitiveEquals(rank_dir, "BT")
+    };
 }
 
 Digraph::Digraph(const std::string_view source)

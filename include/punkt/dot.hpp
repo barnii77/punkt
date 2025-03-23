@@ -2,12 +2,10 @@
 
 #include "punkt/dot_tokenizer.hpp"
 #include "punkt/glyph_loader/glyph_loader.hpp"
-#include "punkt/int_types.hpp"
 
 #include <string>
 #include <forward_list>
 #include <vector>
-#include <memory>
 #include <unordered_map>
 #include <functional>
 
@@ -59,6 +57,10 @@ struct NodeRenderAttrs {
     explicit NodeRenderAttrs();
 };
 
+struct RankDirConfig {
+    bool m_is_sideways{}, m_is_reversed{};
+};
+
 struct Node {
     std::string_view m_name;
     std::vector<std::reference_wrapper<Edge> > m_ingoing;
@@ -68,7 +70,7 @@ struct Node {
 
     Node(std::string_view name, Attrs attrs);
 
-    void populateRenderInfo(const render::glyph::GlyphLoader &glyph_loader);
+    void populateRenderInfo(const render::glyph::GlyphLoader &glyph_loader, RankDirConfig rank_dir);
 };
 
 struct RankRenderAttrs {
@@ -78,6 +80,7 @@ struct RankRenderAttrs {
 struct DigraphRenderAttrs {
     size_t m_rank_sep{}, m_node_sep{}, m_graph_width{}, m_graph_height{}, m_graph_x{}, m_graph_y{},
             m_border_thickness{};
+    RankDirConfig m_rank_dir{};
     std::vector<RankRenderAttrs> m_rank_render_attrs;
     std::vector<GlyphQuad> m_label_quads;
 };

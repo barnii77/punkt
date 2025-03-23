@@ -17,19 +17,13 @@ constexpr auto default_node_sep = static_cast<size_t>(static_cast<float>(DEFAULT
 static void populateGraphLabelText(const Attrs &attrs, const TextAlignment label_ta,
                                    const render::glyph::GlyphLoader &glyph_loader,
                                    std::vector<GlyphQuad> &out_label_quads, size_t &out_graph_label_width,
-                                   size_t &out_graph_label_height) {
+                                   size_t &out_graph_label_height, const RankDirConfig rank_dir) {
     if (const std::string_view graph_label = getAttrOrDefault(attrs, "label", ""); !graph_label.empty()) {
         const size_t graph_label_font_size = getAttrTransformedCheckedOrDefault(
             attrs, "fontsize", default_font_size, stringViewToSizeT);
         populateGlyphQuadsWithText(graph_label, graph_label_font_size, label_ta, glyph_loader, out_label_quads,
-                                   out_graph_label_width, out_graph_label_height);
+                                   out_graph_label_width, out_graph_label_height, rank_dir);
     }
-}
-
-static bool caseInsensitiveEquals(const std::string_view lhs, const std::string_view rhs) {
-    return std::ranges::equal(lhs, rhs, [](const unsigned char a, const unsigned char b) {
-        return std::tolower(a) == std::tolower(b);
-    });
 }
 
 void Digraph::computeGraphLayout(const render::glyph::GlyphLoader &glyph_loader, const size_t graph_x,
@@ -54,7 +48,7 @@ void Digraph::computeGraphLayout(const render::glyph::GlyphLoader &glyph_loader,
 
     size_t graph_label_width = 0, graph_label_height = 0, graph_body_start = 0, graph_label_y = 0;
     populateGraphLabelText(m_attrs, label_ta, glyph_loader, m_render_attrs.m_label_quads, graph_label_width,
-                           graph_label_height);
+                           graph_label_height, m_render_attrs.m_rank_dir);
     if ((caseInsensitiveEquals(label_loc, "T") || caseInsensitiveEquals(label_loc, "L")) && graph_label_height > 0) {
         graph_body_start += graph_label_height + m_render_attrs.m_rank_sep;
     }

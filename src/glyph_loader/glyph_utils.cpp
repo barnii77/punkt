@@ -1,4 +1,5 @@
 #include "punkt/glyph_loader/glyph_loader.hpp"
+#include "punkt/gl_error.hpp"
 
 #include <glad/glad.h>
 
@@ -14,6 +15,12 @@ Glyph::Glyph(const GLuint texture, const size_t width, const size_t height)
     : m_texture(texture), m_meta(width, height) {
 }
 
+Glyph::~Glyph() {
+    if (m_texture) {
+        GL_CHECK(glDeleteTextures(1, &m_texture));
+    }
+}
+
 FontNotFoundException::FontNotFoundException(std::string path)
     : m_path(std::move(path)) {
 }
@@ -25,7 +32,6 @@ IllegalFontSizeException::IllegalFontSizeException(const size_t font_size)
 FontParsingException::FontParsingException(std::string msg)
     : m_msg(std::move(msg)) {
 }
-
 
 const char *FontNotFoundException::what() const noexcept {
     const std::string msg = std::string("Font not found: \"") + std::string(m_path);

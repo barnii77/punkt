@@ -47,16 +47,14 @@ int main() {
 
 ////////////////////// TODOS //////////////////////
 
+// TODO handle dashed and dotted edges, nodes and graph bounding boxes, i.e. the `style` attribute (ESPECIALLY EDGES)
 // TODO handle spline edges
-// TODO make the glyph loader LRU style throw out (and delete) textures when a texture limit is reached
 // TODO I have node order computation kinda working, so now, when I have graph layout computation, I should decide
 // whether I want another x position optimization step that optimizes the gaps between nodes (without changing their
 // order) in a sort of physics sim with moving boxes thing? sounds like a bad idea but is it? I could also do a
 // greedy approach where I go from the leftmost and rightmost nodes inward (double pointer style), barycenter-like
 // moving each node and if it moves left (for the left pointer) or right (for right pointer), I can make more room
 // for the next nodes and continue going inward. On the other hand, maybe I want even spacing. So maybe NOT.
-// TODO handle graph level attributes `style` and `rankdir`
-// TODO handle dashed and dotted edges
 // TODO adapt the GLRenderer so that I can use it for clusters, i.e. with multiple digraphs at once
 // TODO a cluster should become a single super-node when doing all my layout computations. This means it is literally
 // treated as a single (giant) node with special attributes (@type = "cluster", @code = <string_view into the graph
@@ -86,5 +84,4 @@ int main() {
 // TODO maybe I could add drawing on top xD (i.e. you have a separate surface that you draw into in black and that
 // gets rendered last so it overdraws the graph
 // TODO XDD I can add animations because I don't have to comply with the dot language spec exactly, just roughly
-
 // TODO include examples from graphviz docs in examples/

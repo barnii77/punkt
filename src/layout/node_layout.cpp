@@ -17,7 +17,7 @@ GlyphQuad::GlyphQuad(const size_t left, const size_t top, const size_t right, co
     : m_left(left), m_top(top), m_right(right), m_bottom(bottom), m_c(c) {
 }
 
-void Node::populateRenderInfo(const render::glyph::GlyphLoader &glyph_loader) {
+void Node::populateRenderInfo(const render::glyph::GlyphLoader &glyph_loader, const RankDirConfig rank_dir) {
     const std::string_view text = getAttrOrDefault(m_attrs, "label", m_name);
     const size_t font_size = getAttrTransformedCheckedOrDefault(m_attrs, "fontsize", default_font_size,
                                                                 stringViewToSizeT);
@@ -50,7 +50,7 @@ void Node::populateRenderInfo(const render::glyph::GlyphLoader &glyph_loader) {
     }
 
     size_t max_line_width, y;
-    populateGlyphQuadsWithText(text, font_size, ta, glyph_loader, m_render_attrs.m_quads, max_line_width, y);
+    populateGlyphQuadsWithText(text, font_size, ta, glyph_loader, m_render_attrs.m_quads, max_line_width, y, rank_dir);
 
     // TODO handle padding for non-rectangular node shapes (ellipse, oval)
     assert(shape == "none" || shape == "box" || shape == "rect" || shape == "ellipse" || shape == "circle");
@@ -99,6 +99,6 @@ void Node::populateRenderInfo(const render::glyph::GlyphLoader &glyph_loader) {
 
 void Digraph::computeNodeLayouts(const render::glyph::GlyphLoader &glyph_loader) {
     for (Node &node: std::views::values(m_nodes)) {
-        node.populateRenderInfo(glyph_loader);
+        node.populateRenderInfo(glyph_loader, m_render_attrs.m_rank_dir);
     }
 }

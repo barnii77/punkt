@@ -21,13 +21,15 @@ flat out uint frag_node_shape;
 flat out uint frag_border_thickness;
 
 void main() {
+    vec2 reverse_transform = getReverseTransform();
     #pragma unroll
     for (int i = 0; i < 2; i++) {
         #pragma unroll
         for (int j = 0; j < 2; j++) {
-            vec2 vertex_position = gs_in[0].node_top_left + gs_in[0].node_size * vec2(i, j);
-            vec2 position_uv = (vertex_position - camera_pos) / viewport_size;
-            vec2 screen_ndc = zoom * (2.0f * position_uv - 1.0f);
+            vec2 vertex_position = getDirectionTransformedPosition(
+                gs_in[0].node_top_left + gs_in[0].node_size * vec2(i, j));
+            vec2 position_uv = (vertex_position - reverse_transform * camera_pos) / viewport_size;
+            vec2 screen_ndc = zoom * reverse_transform * (2.0f * position_uv - 1.0f);
             screen_ndc.y = -screen_ndc.y;
             gl_Position = vec4(screen_ndc, 0.0f, 1.0f);
 
