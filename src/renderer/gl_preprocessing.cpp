@@ -51,8 +51,8 @@ ShapeQuadInfo::ShapeQuadInfo(const GLuint top_left_x, const GLuint top_left_y, c
 }
 
 EdgeLinePoints::EdgeLinePoints(const std::span<const Vector2<size_t>> points, const GLuint packed_color,
-                               const GLuint line_thickness)
-    : m_points{}, m_packed_color(packed_color), m_line_thickness(line_thickness) {
+                               const GLuint line_thickness, const GLuint edge_style)
+    : m_points{}, m_line_thickness(line_thickness), m_packed_color(packed_color), m_edge_style(edge_style) {
     assert(points.size() >= std::size(m_points));
     for (size_t i = 0; i < std::size(m_points); i++) {
         const auto [x, y] = points[i];
@@ -157,6 +157,10 @@ static VAO moveEdgeLinesToBuffer(const std::span<const EdgeLinePoints> edge_line
     GL_CHECK(glEnableVertexAttribArray(5));
     GL_CHECK(glVertexAttribIPointer(5, 1, GL_UNSIGNED_INT,
         static_cast<GLsizei>(sizeof(EdgeLinePoints)), reinterpret_cast<void *>(9 * sizeof(GLuint))));
+
+    GL_CHECK(glEnableVertexAttribArray(6));
+    GL_CHECK(glVertexAttribIPointer(6, 1, GL_UNSIGNED_INT,
+        static_cast<GLsizei>(sizeof(EdgeLinePoints)), reinterpret_cast<void *>(10 * sizeof(GLuint))));
 
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -312,6 +316,23 @@ static GLuint getPackedColorFromAttrs(const punkt::Attrs &attrs, const std::stri
     return (static_cast<GLuint>(r) << 0) | (static_cast<GLuint>(g) << 8) | (static_cast<GLuint>(b) << 16);
 }
 
+constexpr GLuint style_solid = 0;
+constexpr GLuint style_dotted = 1;
+constexpr GLuint style_dashed = 2;
+constexpr GLuint style_bullet = 3;
+
+static GLuint getStyleId(const std::string_view style) {
+    if (style == "dotted") {
+        return style_dotted;
+    } else if (style == "dashed") {
+        return style_dashed;
+    } else if (style == "bullet") {
+        return style_bullet;
+    }
+    // default to solid if unrecognized
+    return style_solid;
+}
+
 constexpr GLuint node_shape_none = 0;
 constexpr GLuint node_shape_box = 1;
 constexpr GLuint node_shape_ellipse = 2;
@@ -421,6 +442,7 @@ GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
             assert(edge.m_render_attrs.m_trajectory.size() == expected_edge_line_length);
 
             const GLuint edge_color = getPackedColorFromAttrs(edge.m_attrs, "color", "black");
+            const GLuint edge_style = getStyleId(getAttrOrDefault(edge.m_attrs, "style", "solid"));
 
             const float edge_pen_width = getAttrTransformedCheckedOrDefault(
                 edge.m_attrs, "penwidth", 1.0f, stringViewToFloat);
@@ -429,7 +451,7 @@ GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
             const auto edge_thickness = static_cast<GLuint>(
                 edge_pen_width * static_cast<float>(dpi) / static_cast<float>(DEFAULT_DPI));
 
-            m_edge_line_points.emplace_back(edge.m_render_attrs.m_trajectory, edge_color, edge_thickness);
+            m_edge_line_points.emplace_back(edge.m_render_attrs.m_trajectory, edge_color, edge_thickness, edge_style);
 
             buildArrows(edge, edge_color);
 

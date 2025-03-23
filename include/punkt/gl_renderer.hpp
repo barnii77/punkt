@@ -47,8 +47,10 @@ struct EdgeLinePoints {
     Vector2<GLuint> m_points[expected_edge_line_length];
     GLuint m_line_thickness;
     GLuint m_packed_color;
+    GLuint m_edge_style;
 
-    explicit EdgeLinePoints(std::span<const Vector2<size_t>> points, GLuint packed_color, GLuint line_thickness);
+    explicit EdgeLinePoints(std::span<const Vector2<size_t>> points, GLuint packed_color, GLuint line_thickness,
+                            GLuint edge_style);
 };
 
 struct EdgeArrowTriangle {

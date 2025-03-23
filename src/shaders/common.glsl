@@ -4,6 +4,8 @@ uniform float zoom;
 uniform int is_sideways;
 uniform int is_reversed;
 
+#define SMOOTH_LT_ANTIALIASING_INTERPOLATION_SCALE 10.0f
+
 vec4 unpackColor(uint color) {
     float r = float((color >> 0) & 0xFFU) / 255.0f;
     float g = float((color >> 8) & 0xFFU) / 255.0f;
@@ -30,4 +32,16 @@ vec2 getReverseTransform() {
 
 vec2 applyReverseTranformToUV(vec2 uv, vec2 transform) {
     return (transform * (2.0f * uv - 1.0f) + 1.0f) / 2.0f;
+}
+
+float smoothLessThan(float a, float b) {
+    float x = a - b + 0.5f;
+    return smoothstep(1.0f, 0.0f, x * SMOOTH_LT_ANTIALIASING_INTERPOLATION_SCALE * zoom);
+}
+
+// smoothed out version of the hypothetical boolean "is point p inside of the given ellipse?"
+float isInEllipse(vec2 p, vec2 radii) {
+    vec2 norm = p / radii;
+    float d = dot(norm, norm);
+    return smoothLessThan(d - 0.5f + 1.0f / SMOOTH_LT_ANTIALIASING_INTERPOLATION_SCALE, 1.0f);
 }

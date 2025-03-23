@@ -47,7 +47,6 @@ int main() {
 
 ////////////////////// TODOS //////////////////////
 
-// TODO handle dashed and dotted edges, nodes and graph bounding boxes, i.e. the `style` attribute (ESPECIALLY EDGES)
 // TODO handle spline edges
 // TODO I have node order computation kinda working, so now, when I have graph layout computation, I should decide
 // whether I want another x position optimization step that optimizes the gaps between nodes (without changing their
@@ -76,11 +75,10 @@ int main() {
 // TODO handle DPI properly, currently, 1 dot = 1 pixel, but that's simply not true
 // TODO handle font loading manually - write a minimal TTF parser and renderer
 // TODO make sure this builds using all major build systems (make, ninja, visual studio msbuild)
-// TODO maybe handle xlabels on edges eventually (external label, i.e. the edge goes through the left edge of the
-// TODO handle `labelangle` attribute right after the glyph quads have been populated for an edge relative to the top
-// left glyph. At this point, I can do trigonometry like with the arrows and rotate the text
+// TODO maybe handle xlabels on edges eventually (external label, i.e. the edge goes through the left edge of the left
+// glyph. At this point I can do trigonometry like with the arrows and rotate the text label node instead of the center)
 // TODO maybe handle color gradients on edges eventually
-// label node instead of the center)
+// TODO handle `labelangle` attribute right after the glyph quads have been populated for an edge relative to the top
 // TODO maybe I could add drawing on top xD (i.e. you have a separate surface that you draw into in black and that
 // gets rendered last so it overdraws the graph
 // TODO XDD I can add animations because I don't have to comply with the dot language spec exactly, just roughly
