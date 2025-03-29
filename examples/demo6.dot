@@ -1,0 +1,40 @@
+digraph simplified {
+  rankdir=LR;
+  node [fontsize=10, shape=box];
+  edge [fontsize=10];
+
+  // First rank: a single source node.
+  { rank = same;
+    A;
+  }
+
+  // Second rank: several nodes receiving edges from A.
+  { rank = same;
+    B; C; D;
+  }
+
+  // Third rank: a single target node.
+  { rank = same;
+    E; F;
+  }
+
+  // Edges from A to all middle nodes.
+  A -- B;
+  A -- C;
+  A -- D;
+
+  // Edges from middle nodes to E.
+  B -- E;
+  C -- E;
+
+  D -- F;
+
+  { rank=same;
+    H; I; J; K; L;
+  }
+  F -- H;
+  F -- I;
+  F -- J;
+  F -- K;
+  F -- L;
+}

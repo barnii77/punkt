@@ -1,5 +1,5 @@
 digraph G {
-    // define graph quad
+    // punktxopt=false  // you can disable x optimization with this
     label="MIGHTY DIGRAPH";
     pad=0.2;
     labelloc=B;

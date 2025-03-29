@@ -58,7 +58,7 @@ static Vector2<size_t> getTrajectoryEndPoint(const std::span<const Vector2<size_
     }
 }
 
-void Digraph::computeEdgeLabelLayouts(const render::glyph::GlyphLoader &glyph_loader) {
+void Digraph::computeEdgeLabelLayouts(render::glyph::GlyphLoader &glyph_loader) {
     for (Node &node: std::views::values(m_nodes)) {
         for (Edge &edge: node.m_outgoing) {
             if (!edge.m_render_attrs.m_is_visible || edge.m_render_attrs.m_trajectory.empty()) {

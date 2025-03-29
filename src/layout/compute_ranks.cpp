@@ -8,11 +8,12 @@
 #include <functional>
 #include <unordered_set>
 #include <cassert>
+#include <numeric>
 
 using namespace punkt;
 
-static size_t max_rank_range_start = 0x8000000000000000ull;
-static size_t size_max = 0xFFFFFFFFFFFFFFFFull;
+static size_t size_max = std::numeric_limits<size_t>::max();
+static size_t max_rank_range_start = size_max / 2;
 
 static void topoSortNodesImpl(Digraph &dg, Node &node, std::vector<std::reference_wrapper<Node> > &out,
                               std::unordered_set<const Node *> &visited) {

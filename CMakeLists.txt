@@ -245,7 +245,9 @@ add_library(punkt
         src/layout/compute_ranks.cpp
         src/layout/insert_ghost_nodes.cpp
         src/layout/order_nodes_horizontally.cpp
-        src/layout/node_layout.cpp
+        src/layout/initial_node_layout.cpp
+        src/layout/optimize_node_x_positions.cpp
+        src/layout/common.cpp
         src/layout/graph_layout.cpp
         src/layout/edge_layout.cpp
         src/layout/edge_label_layout.cpp
@@ -271,6 +273,7 @@ add_library(punkt
         include/punkt/glyph_loader/glyph_loader.hpp
         include/punkt/glyph_loader/default_font_resources.hpp
         include/punkt/glyph_loader/psf1_loader.hpp
+        include/punkt/layout/common.hpp
 )
 target_include_directories(punkt PRIVATE include/)
 target_include_directories(punkt PRIVATE ${GENERATED_PARENT_DIR})

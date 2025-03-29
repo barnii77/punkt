@@ -24,7 +24,11 @@ constexpr auto KWD_GRAPH = "graph";
 // decides whether to use median or mean barycenter (constexpr so compiler can do optimization magic)
 // NOTE: empirically, median seems to work *way* better than mean
 constexpr bool BARYCENTER_USE_MEDIAN = true;
+constexpr bool BARYCENTER_X_OPTIMIZATION_USE_MEDIAN = true;
+constexpr bool BARYCENTER_SWEEP_DIRECTION_IS_OUTER_LOOP = false;
+constexpr bool BARYCENTER_X_OPTIMIZATION_SWEEP_DIRECTION_IS_OUTER_LOOP = false;
 // all this doesn't benefit from being constexpr because it's just magic numbers anyway
+extern float BARYCENTER_ORDERING_FADEOUT;
 extern float BARYCENTER_ORDERING_DAMPENING;
 extern float BARYCENTER_MIN_AVERAGE_CHANGE_REQUIRED;
 extern ssize_t BARYCENTER_ORDERING_MAX_ITERS_PER_DIRECTION;
@@ -34,3 +38,10 @@ extern float BUBBLE_ORDERING_CROSSOVER_COUNT_WEIGHT;
 extern float BUBBLE_ORDERING_DX_WEIGHT;
 extern ssize_t BUBBLE_ORDERING_MAX_ITERS;
 constexpr size_t DEFAULT_DPI = 96;
+// X optimization is the process which optimizes the initial x positioning of the nodes while keeping ordering fixed
+extern float BARYCENTER_X_OPTIMIZATION_FADEOUT;
+extern float BARYCENTER_X_OPTIMIZATION_DAMPENING;
+extern float BARYCENTER_X_OPTIMIZATION_MIN_AVERAGE_CHANGE_REQUIRED;
+extern float BARYCENTER_X_OPTIMIZATION_PULL_TOWARDS_MEAN;
+extern float BARYCENTER_X_OPTIMIZATION_REGULARIZATION;
+extern ssize_t BARYCENTER_X_OPTIMIZATION_MAX_ITERS;

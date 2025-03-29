@@ -20,7 +20,7 @@ void main() {
     // normalize position with camera and viewport and map to NDC
     vec2 position_uv = (position - reverse_transform * camera_pos) / viewport_size;
     vec2 screen_ndc = zoom * reverse_transform * (2.0f * position_uv - 1.0f);
-    // flip y dimension because any sane UI library has (0, 0) in the top left corner
+    // flip y dimension because any sane 2D graphics library has (0, 0) in the top left corner
     screen_ndc.y = -screen_ndc.y;
 
     gl_Position = vec4(screen_ndc, 0.0f, 1.0f);

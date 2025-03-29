@@ -17,7 +17,7 @@ GlyphQuad::GlyphQuad(const size_t left, const size_t top, const size_t right, co
     : m_left(left), m_top(top), m_right(right), m_bottom(bottom), m_c(c) {
 }
 
-void Node::populateRenderInfo(const render::glyph::GlyphLoader &glyph_loader, const RankDirConfig rank_dir) {
+void Node::populateRenderInfo(render::glyph::GlyphLoader &glyph_loader, const RankDirConfig rank_dir) {
     const std::string_view text = getAttrOrDefault(m_attrs, "label", m_name);
     const size_t font_size = getAttrTransformedCheckedOrDefault(m_attrs, "fontsize", default_font_size,
                                                                 stringViewToSizeT);
@@ -52,7 +52,6 @@ void Node::populateRenderInfo(const render::glyph::GlyphLoader &glyph_loader, co
     size_t max_line_width, y;
     populateGlyphQuadsWithText(text, font_size, ta, glyph_loader, m_render_attrs.m_quads, max_line_width, y, rank_dir);
 
-    // TODO handle padding for non-rectangular node shapes (ellipse, oval)
     assert(shape == "none" || shape == "box" || shape == "rect" || shape == "ellipse" || shape == "circle");
 
     auto border_thickness = static_cast<size_t>(pen_width * static_cast<float>(dpi) / static_cast<float>(DEFAULT_DPI));
@@ -60,7 +59,7 @@ void Node::populateRenderInfo(const render::glyph::GlyphLoader &glyph_loader, co
         border_thickness = 0;
     }
     // how much to adjust the width and height by based on border thickness.
-    // TODO adjust for other shapes
+    // TODO adjust for non-rectangular shapes
     const auto border_thickness_size_adjustment = 2 * border_thickness;
 
     // add padding around the text
@@ -97,7 +96,7 @@ void Node::populateRenderInfo(const render::glyph::GlyphLoader &glyph_loader, co
     }
 }
 
-void Digraph::computeNodeLayouts(const render::glyph::GlyphLoader &glyph_loader) {
+void Digraph::computeNodeLayouts(render::glyph::GlyphLoader &glyph_loader) {
     for (Node &node: std::views::values(m_nodes)) {
         node.populateRenderInfo(glyph_loader, m_render_attrs.m_rank_dir);
     }

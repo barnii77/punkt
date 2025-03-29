@@ -80,11 +80,14 @@ std::vector<Token> punkt::tokenizer::tokenize(Digraph &dg, std::string_view s) {
             out.emplace_back(",", Token::Type::comma);
             advance_by = 1;
         } else if (c == '-') {
-            // TODO handle undirected edges
-            if (s.length() < 2 || (c = s.at(1)) != '>') {
+            c = s.length() < 2 ? '\0' : s.at(1);
+            if (c == '>') {
+                out.emplace_back("->", Token::Type::arrow);
+            } else if (c == '-') {
+                out.emplace_back("--", Token::Type::undirected_conn);
+            } else {
                 throw UnexpectedCharException(c);
             }
-            out.emplace_back("->", Token::Type::arrow);
             advance_by = 2;
         } else if (c == '/') {
             if (s.length() < 2 || (c = s.at(1)) != '/') {

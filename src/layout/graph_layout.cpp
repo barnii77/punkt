@@ -15,9 +15,9 @@ constexpr auto default_rank_sep = static_cast<size_t>(static_cast<float>(DEFAULT
 constexpr auto default_node_sep = static_cast<size_t>(static_cast<float>(DEFAULT_DPI) * 0.25f);
 
 static void populateGraphLabelText(const Attrs &attrs, const TextAlignment label_ta,
-                                   const render::glyph::GlyphLoader &glyph_loader,
-                                   std::vector<GlyphQuad> &out_label_quads, size_t &out_graph_label_width,
-                                   size_t &out_graph_label_height, const RankDirConfig rank_dir) {
+                                   render::glyph::GlyphLoader &glyph_loader, std::vector<GlyphQuad> &out_label_quads,
+                                   size_t &out_graph_label_width, size_t &out_graph_label_height,
+                                   const RankDirConfig rank_dir) {
     if (const std::string_view graph_label = getAttrOrDefault(attrs, "label", ""); !graph_label.empty()) {
         const size_t graph_label_font_size = getAttrTransformedCheckedOrDefault(
             attrs, "fontsize", default_font_size, stringViewToSizeT);
@@ -26,7 +26,7 @@ static void populateGraphLabelText(const Attrs &attrs, const TextAlignment label
     }
 }
 
-void Digraph::computeGraphLayout(const render::glyph::GlyphLoader &glyph_loader, const size_t graph_x,
+void Digraph::computeGraphLayout(render::glyph::GlyphLoader &glyph_loader, const size_t graph_x,
                                  const size_t graph_y) {
     m_render_attrs.m_graph_x = graph_x;
     m_render_attrs.m_graph_y = graph_y;
@@ -40,7 +40,8 @@ void Digraph::computeGraphLayout(const render::glyph::GlyphLoader &glyph_loader,
 
     // graphs by default don't have padding and a margin
     const float graph_border_padding = getAttrTransformedCheckedOrDefault(m_attrs, "pad", 0.0f, stringViewToFloat);
-    const float graph_border_pen_width = getAttrTransformedCheckedOrDefault(m_attrs, "penwidth", 0.0f, stringViewToFloat);
+    const float graph_border_pen_width = getAttrTransformedCheckedOrDefault(
+        m_attrs, "penwidth", 0.0f, stringViewToFloat);
 
     constexpr size_t dpi = DEFAULT_DPI; // TODO handle custom DPI settings
     m_render_attrs.m_border_thickness = static_cast<size_t>(

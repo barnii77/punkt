@@ -70,7 +70,7 @@ struct Node {
 
     Node(std::string_view name, Attrs attrs);
 
-    void populateRenderInfo(const render::glyph::GlyphLoader &glyph_loader, RankDirConfig rank_dir);
+    void populateRenderInfo(render::glyph::GlyphLoader &glyph_loader, RankDirConfig rank_dir);
 };
 
 struct RankRenderAttrs {
@@ -145,13 +145,15 @@ struct Digraph {
 
     void computeHorizontalOrderings();
 
-    void computeNodeLayouts(const render::glyph::GlyphLoader &glyph_loader);
+    void computeNodeLayouts(render::glyph::GlyphLoader &glyph_loader);
 
-    void computeGraphLayout(const render::glyph::GlyphLoader &glyph_loader, size_t graph_x, size_t graph_y);
+    void computeGraphLayout(render::glyph::GlyphLoader &glyph_loader, size_t graph_x, size_t graph_y);
+
+    void optimizeGraphLayout();
 
     void computeEdgeLayout();
 
-    void computeEdgeLabelLayouts(const render::glyph::GlyphLoader &glyph_loader);
+    void computeEdgeLabelLayouts(render::glyph::GlyphLoader &glyph_loader);
 
 private:
     void swapNodesOnRank(std::string_view a, std::string_view b);

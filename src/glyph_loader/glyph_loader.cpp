@@ -18,7 +18,7 @@ size_t GlyphCharInfoHasher::operator()(const GlyphCharInfo &glyph) const noexcep
     return h1 ^ ((h2 << 13) | (h2 >> (32 - 13)));
 }
 
-GlyphMeta GlyphLoader::getGlyphMeta(const char32_t c, const size_t font_size) const {
+GlyphMeta GlyphLoader::getGlyphMeta(const char32_t c, const size_t font_size) {
     if (font_size == 0 || font_size > m_max_allowed_font_size) {
         throw IllegalFontSizeException(font_size);
     }

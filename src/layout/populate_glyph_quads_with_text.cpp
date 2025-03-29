@@ -21,8 +21,8 @@ TextAlignment punkt::textAlignmentFromStr(const std::string_view &s) {
 // helper function to append all the glyph quads for the given text at the given font size and the given text alignment
 // with (0, 0) being the top left of the text bounding box
 void punkt::populateGlyphQuadsWithText(const std::string_view &text, const size_t font_size, const TextAlignment ta,
-              const render::glyph::GlyphLoader &glyph_loader, std::vector<GlyphQuad> &out_quads,
-              size_t &out_max_line_width, size_t &out_height, const RankDirConfig rank_dir) {
+                                       render::glyph::GlyphLoader &glyph_loader, std::vector<GlyphQuad> &out_quads,
+                                       size_t &out_max_line_width, size_t &out_height, const RankDirConfig rank_dir) {
     std::vector<size_t> quad_lines;
     quad_lines.reserve(text.length());
     out_quads.reserve(text.length());

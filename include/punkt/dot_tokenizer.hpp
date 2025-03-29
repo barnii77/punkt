@@ -22,6 +22,7 @@ struct Token {
         comma,
         comment_start,
         arrow,
+        undirected_conn,
     };
 
     std::string_view m_value;

@@ -40,20 +40,34 @@ static std::string readInputFile(const char *path) {
 }
 
 int main() {
-    const std::string test_input = readInputFile("temp/test.dot");
+    const char *path = "examples/graphviz_gallery/ninja.dot";
+    path = "examples/demo5.dot";
+    const std::string test_input = readInputFile(path);
     const auto font_path = "resources/fonts/tinyfont.psf";
     punktRun(test_input.data(), font_path);
 }
 
 ////////////////////// TODOS //////////////////////
 
+// TODO in optimize_node_x_positions.cpp, I have a todo where I have to recompute graph layout after node optimization
+    // I should move part of that computation after optimization (or twice if I want to do the rejection from below)
+// TODO I have a massive antialiasing problem
+// TODO should I only apply pull towards mean in x opt to groups, but not individual nodes?
+    // if I do that, make sure to weight the groups by group size
+        // I feel like the pull should be stronger in more dense ranks in general and should be weaker (not stronger as
+        // it currently unintentionally is) in sparse ranks. See ninja.dot for why
+// TODO I think I have a bug where the x optimization will actually position nodes at (rank+1) slightly to
+// right/down compared to where they should actually be... would explain the fact demo2.dot and the ninja.dot example
+// are so weird (by which I mean that there are no straight edges where there should be straight edges and more iters
+// do not help)
+// TODO test the stability of my x optimization
+    // TODO figure out why it explodes with examples/demo3.dot without regularization and pull towards mean
+    // TODO should I bound it? (e.g. 2 * graph_dims)
 // TODO handle spline edges
-// TODO I have node order computation kinda working, so now, when I have graph layout computation, I should decide
-// whether I want another x position optimization step that optimizes the gaps between nodes (without changing their
-// order) in a sort of physics sim with moving boxes thing? sounds like a bad idea but is it? I could also do a
-// greedy approach where I go from the leftmost and rightmost nodes inward (double pointer style), barycenter-like
-// moving each node and if it moves left (for the left pointer) or right (for right pointer), I can make more room
-// for the next nodes and continue going inward. On the other hand, maybe I want even spacing. So maybe NOT.
+// TODO do something with x optimization (optimize_node_x_positions.cpp) to incentivise straight lines slightly more
+// TODO maybe add something that rates the x positioning before and after x optimization and discards the optimization
+// results in favor of the initial positioning if the score is worse? It seems the barycenter x positioning better only
+// on some graphs, not universally better.
 // TODO adapt the GLRenderer so that I can use it for clusters, i.e. with multiple digraphs at once
 // TODO a cluster should become a single super-node when doing all my layout computations. This means it is literally
 // treated as a single (giant) node with special attributes (@type = "cluster", @code = <string_view into the graph

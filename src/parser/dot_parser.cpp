@@ -200,10 +200,23 @@ static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::T
         }
         std::vector<std::string_view> constrained_nodes;
         expectAndConsume(tokens, tokenizer::Token::Type::semicolon);
-        while (!nextTokenIs(tokens, tokenizer::Token::Type::semicolon)) {
-            constrained_nodes.emplace_back(expectAndConsume(tokens, tokenizer::Token::Type::string).m_value);
+
+        // parse nodes
+        while (!nextTokenIs(tokens, tokenizer::Token::Type::rcurly)) {
+            tokenizer::Token node_tok = expectAndConsume(tokens, tokenizer::Token::Type::string);
+            validateNodeName(node_tok.m_value);
+            // handle node declaration
+            Attrs attrs = consumeAttrs(tokens);
+            validateAttrs(attrs);
+            // handle defaults set by `node [...];`
+            mergeAttrsInto(dg.m_default_node_attrs, attrs);
+            if (nextTokenIs(tokens, tokenizer::Token::Type::semicolon)) {
+                expectAndConsume(tokens, tokenizer::Token::Type::semicolon);
+            }
+            dg.m_nodes.insert_or_assign(node_tok.m_value, Node(node_tok.m_value, attrs));
+
+            constrained_nodes.emplace_back(node_tok.m_value);
         }
-        expectAndConsume(tokens, tokenizer::Token::Type::semicolon);
         expectAndConsume(tokens, tokenizer::Token::Type::rcurly);
         for (const auto &node_name: constrained_nodes) {
             implicitCreateNodeIfNotExists(dg, node_name, dg.m_default_node_attrs);
@@ -214,14 +227,20 @@ static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::T
             node.m_attrs.insert_or_assign("@constraints", dg.m_generated_sources.front());
         }
         dg.m_rank_constraints.emplace_back(ty.m_value, std::move(constrained_nodes));
-    } else if (nextTokenIs(tokens, tokenizer::Token::Type::arrow)) {
+    } else if (nextTokenIs(tokens, tokenizer::Token::Type::arrow) ||
+               nextTokenIs(tokens, tokenizer::Token::Type::undirected_conn)) {
         validateNodeName(a.m_value);
         // handle edge declaration(s)
         implicitCreateNodeIfNotExists(dg, a.m_value, dg.m_default_node_attrs);
         std::vector<Edge> new_edges;
+        std::vector<bool> edges_undirected;
 
         do {
-            expectAndConsume(tokens, tokenizer::Token::Type::arrow);
+            static std::array expected_connection_tokens = {
+                tokenizer::Token::Type::arrow, tokenizer::Token::Type::undirected_conn
+            };
+            tokenizer::Token conn_tok = expectAndConsumeOneOf(tokens, expected_connection_tokens);
+            edges_undirected.emplace_back(conn_tok.m_type == tokenizer::Token::Type::undirected_conn);
             const tokenizer::Token b = expectAndConsume(tokens, tokenizer::Token::Type::string);
             implicitCreateNodeIfNotExists(dg, b.m_value, dg.m_default_node_attrs);
             new_edges.emplace_back(a.m_value, b.m_value);
@@ -235,8 +254,16 @@ static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::T
         mergeAttrsInto(dg.m_default_edge_attrs, attrs);
 
         // assign attrs
-        for (Edge &e: new_edges) {
-            e.m_attrs = attrs;
+        for (size_t i = 0; i < new_edges.size(); i++) {
+            Edge &e = new_edges[i];
+            if (edges_undirected[i]) {
+                // make copy and insert dir=none (which makes it undirected)
+                attrs = Attrs(attrs);
+                attrs.insert_or_assign("dir", "none");
+                e.m_attrs = std::move(attrs);
+            } else {
+                e.m_attrs = attrs;
+            }
         }
 
         // insert edges

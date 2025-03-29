@@ -77,7 +77,7 @@ class GlyphLoader {
 
 public:
     // avoids actually loading the glyph if it's not already loaded
-    [[nodiscard]] GlyphMeta getGlyphMeta(char32_t c, size_t font_size) const;
+    [[nodiscard]] GlyphMeta getGlyphMeta(char32_t c, size_t font_size);
 
     const Glyph &getGlyph(char32_t c, size_t font_size);
 
