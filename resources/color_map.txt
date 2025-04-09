@@ -5,3 +5,6 @@ blue: #0000FF
 white: #FFFFFF
 grey: #7F7F7F
 gray: #7F7F7F
+lightpink: #FFB6C1
+lightblue: #ADD8E6
+thistle: #D8BFD8

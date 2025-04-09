@@ -1,7 +1,7 @@
 #pragma once
 
 #include "punkt/dot.hpp"
-#include "punkt/int_types.hpp"
+#include "punkt/utils/int_types.hpp"
 
 #include <vector>
 #include <functional>
@@ -45,12 +45,12 @@ void populateOrderingIndexAtRank(Digraph &dg, size_t rank);
 void populateInitialOrderings(Digraph &dg);
 
 
-using BarycenterSweepOperatorFunc = std::function<void(Digraph &, const std::vector<float> &,
-                                                       const std::vector<float> &, size_t, bool &)>;
+using BarycenterSweepOperatorFunc = std::function<void(Digraph &, std::vector<float>, std::vector<float>, size_t,
+                                                       bool &)>;
 
 void barycenterSweep(Digraph &dg, bool is_downward_sweep, bool &improvement_found, float &total_change,
                      const BarycenterSweepOperatorFunc &sweep_operator, bool use_median, float barycenter_dampening,
-                     bool consider_node_widths);
+                     ssize_t start_rank = -1, ssize_t n_ranks = -1);
 
 float getRankOrderingScore(const Digraph &dg, size_t rank);
 

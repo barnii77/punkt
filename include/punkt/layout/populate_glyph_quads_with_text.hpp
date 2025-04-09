@@ -1,6 +1,6 @@
 #pragma once
 
-#include "punkt/dot.hpp"
+#include "../dot.hpp"
 
 namespace punkt {
 enum class TextAlignment {

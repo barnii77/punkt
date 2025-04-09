@@ -48,6 +48,7 @@ struct EdgeLinePoints {
     GLuint m_line_thickness;
     GLuint m_packed_color;
     GLuint m_edge_style;
+    GLfloat m_total_curve_length;
 
     explicit EdgeLinePoints(std::span<const Vector2<size_t>> points, GLuint packed_color, GLuint line_thickness,
                             GLuint edge_style);
@@ -74,12 +75,13 @@ struct GLRenderer {
     std::vector<ShapeQuadInfo> m_cluster_quads;
     std::vector<ShapeQuadInfo> m_node_quads;
     std::vector<EdgeLinePoints> m_edge_line_points;
+    std::vector<EdgeLinePoints> m_edge_spline_points;
     std::vector<EdgeArrowTriangle> m_edge_arrow_triangles;
     // opengl buffers
     VAO m_node_quad_buffer{}, m_digraph_quad_buffer{}, m_cluster_quads_buffer{}, m_edge_lines_buffer{},
-            m_arrow_triangles_buffer{};
+            m_edge_splines_buffer{}, m_arrow_triangles_buffer{};
     std::unordered_map<glyph::GlyphCharInfo, VAO, glyph::GlyphCharInfoHasher> m_char_buffers;
-    GLuint m_nodes_shader{}, m_chars_shader{}, m_edges_shader{}, m_arrows_shader{};
+    GLuint m_nodes_shader{}, m_chars_shader{}, m_edges_shader{}, m_edge_splines_shader{}, m_arrows_shader{};
 
     explicit GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader);
 

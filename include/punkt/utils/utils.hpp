@@ -98,6 +98,12 @@ private:
     std::list<KeyValuePair> m_cache_list; // Stores key-value pairs (ordered by usage)
     std::unordered_map<Key, ListIterator, KeyHasher> m_cache_map; // Maps keys to list iterators
 };
+
+void evaluateBezier(double t, double p0_x, double p0_y, double p1_x, double p1_y, double p2_x, double p2_y, double p3_x,
+                    double p3_y, double &out_x, double &out_y);
+
+double bezierCurveLength(double p0_x, double p0_y, double p1_x, double p1_y, double p2_x, double p2_y, double p3_x,
+                         double p3_y);
 }
 
 #define getAttrOrDefault(attrs, attr_name, default_value) ((attrs).contains(attr_name) ? (attrs).at(attr_name) : (default_value))

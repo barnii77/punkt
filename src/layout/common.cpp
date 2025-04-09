@@ -1,6 +1,6 @@
 #include "punkt/dot.hpp"
 #include "punkt/dot_constants.hpp"
-#include "punkt/int_types.hpp"
+#include "punkt/utils/int_types.hpp"
 #include "punkt/layout/common.hpp"
 
 #include <cassert>
@@ -370,17 +370,16 @@ void Digraph::swapNodesOnRank(const std::string_view a, const std::string_view b
 
 void layout::barycenterSweep(Digraph &dg, const bool is_downward_sweep, bool &improvement_found, float &total_change,
                              const BarycenterSweepOperatorFunc &sweep_operator, const bool use_median,
-                             const float barycenter_dampening, const bool consider_node_widths) {
+                             const float barycenter_dampening, const ssize_t start_rank, const ssize_t n_ranks) {
     // iterates ranks [n - 1, 0) if is_upward_pass else [0, n - 1)
-    ssize_t start, end;
-    int rank_step;
+    ssize_t start, end, rank_step;
     if (is_downward_sweep) {
-        start = 1;
-        end = static_cast<ssize_t>(dg.m_per_rank_orderings.size());
+        start = 1 + (start_rank < 0 ? 0 : start_rank);
+        end = n_ranks < 0 ? static_cast<ssize_t>(dg.m_per_rank_orderings.size()) : start + n_ranks;
         rank_step = 1;
     } else {
-        start = static_cast<ssize_t>(dg.m_per_rank_orderings.size()) - 2;
-        end = -1;
+        start = static_cast<ssize_t>(dg.m_per_rank_orderings.size()) - 2 - (start_rank < 0 ? 0 : start_rank);
+        end = n_ranks < 0 ? -1 : start - n_ranks;
         rank_step = -1;
     }
 
@@ -404,14 +403,16 @@ void layout::barycenterSweep(Digraph &dg, const bool is_downward_sweep, bool &im
         for (size_t i = 0; i < inner_dim; i++) {
             const auto &node_name = dg.m_per_rank_orderings.at(rank - rank_step).at(i);
             const auto &node = dg.m_nodes.at(node_name);
-            const auto width_adjustment = consider_node_widths
-                                              ? static_cast<float>(node.m_render_attrs.m_width) / 2.0f
-                                              : 0.0f;
-            current_other_rank_barycenters[i] = node.m_render_attrs.m_barycenter_x + width_adjustment;
+            current_other_rank_barycenters[i] = node.m_render_attrs.m_barycenter_x;
+            // const auto width_adjustment = consider_node_widths
+            //                                   ? static_cast<float>(node.m_render_attrs.m_width) / 2.0f
+            //                                   : 0.0f;
+            // current_other_rank_barycenters[i] = node.m_render_attrs.m_barycenter_x + width_adjustment;
         }
+        const auto &rank_ordering = dg.m_per_rank_orderings.at(rank);
         for (size_t i = 0; i < n_barycenters; i++) {
             float p;
-            const auto &node_name = dg.m_per_rank_orderings.at(rank).at(i);
+            const auto &node_name = rank_ordering.at(i);
             auto &node = dg.m_nodes.at(node_name);
             if (use_median) {
                 p = medianBarycenterX(current_other_rank_barycenters.data(),
@@ -431,6 +432,6 @@ void layout::barycenterSweep(Digraph &dg, const bool is_downward_sweep, bool &im
             new_barycenters[i] = new_barycenter;
         }
 
-        sweep_operator(dg, new_barycenters, old_barycenters, rank, improvement_found);
+        sweep_operator(dg, std::move(new_barycenters), std::move(old_barycenters), rank, improvement_found);
     }
 }

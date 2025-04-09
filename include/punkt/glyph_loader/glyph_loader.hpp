@@ -9,7 +9,7 @@
 #include <variant>
 #include <span>
 
-#include "punkt/utils.hpp"
+#include "punkt/utils/utils.hpp"
 
 namespace punkt::render::glyph {
 struct GlyphCharInfo {

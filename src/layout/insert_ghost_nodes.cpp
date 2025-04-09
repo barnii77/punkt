@@ -1,12 +1,11 @@
 #include "punkt/dot.hpp"
-#include "punkt/int_types.hpp"
+#include "punkt/utils/int_types.hpp"
+#include "punkt/utils/utils.hpp"
 
 #include <ranges>
 #include <string>
 #include <cassert>
 #include <optional>
-
-#include "punkt/utils.hpp"
 
 using namespace punkt;
 
@@ -106,12 +105,14 @@ static void decomposeEdgeIfRequired(Digraph &dg, const std::string_view source_n
             {
                 Node &source = dg.m_nodes.at(source_name);
                 source.m_outgoing.emplace_back(source.m_name, ghost_name, getGhostEdgeAttrs(edge_attrs, 0, 2));
+                source.m_outgoing.back().m_render_attrs.m_is_part_of_self_connection = true;
             }
             // ghost -> dest
             {
                 const Node &dest = dg.m_nodes.at(dest_name);
-                dg.m_nodes.at(ghost_name).m_outgoing.emplace_back(ghost_name, dest.m_name,
-                                                                  getGhostEdgeAttrs(edge_attrs, 1, 2));
+                Node &ghost = dg.m_nodes.at(ghost_name);
+                ghost.m_outgoing.emplace_back(ghost_name, dest.m_name, getGhostEdgeAttrs(edge_attrs, 1, 2));
+                ghost.m_outgoing.back().m_render_attrs.m_is_part_of_self_connection = true;
             }
         } else {
             const int edge_dir = rank_diff < 0 ? -1 : 1;

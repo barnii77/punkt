@@ -1,8 +1,8 @@
 #include "punkt/dot.hpp"
 #include "punkt/glyph_loader/glyph_loader.hpp"
-#include "punkt/utils.hpp"
+#include "punkt/utils/utils.hpp"
 #include "punkt/dot_constants.hpp"
-#include "punkt/populate_glyph_quads_with_text.hpp"
+#include "punkt/layout/populate_glyph_quads_with_text.hpp"
 
 #include <ranges>
 #include <cassert>
@@ -23,7 +23,26 @@ void Node::populateRenderInfo(render::glyph::GlyphLoader &glyph_loader, const Ra
                                                                 stringViewToSizeT);
     const TextAlignment ta =
             getAttrTransformedOrDefault(m_attrs, "labeljust", default_label_just, textAlignmentFromStr);
-    const float margin = getAttrTransformedCheckedOrDefault(m_attrs, "margin", 0.11f, stringViewToFloat);
+    float margin_x, margin_y;
+    const std::string_view margin_str = getAttrOrDefault(m_attrs, "margin", "");
+    if (const auto margin_str_comma_pos = margin_str.find(','); margin_str_comma_pos != margin_str.npos) {
+        const std::string_view margin_x_str = margin_str.substr(0, margin_str_comma_pos);
+        std::string_view margin_y_str = margin_str.substr(margin_str_comma_pos + 1);
+        const auto n_spaces_to_trim = margin_y_str.find_first_not_of(' ');
+        if (n_spaces_to_trim < 0) {
+            throw IllegalAttributeException("margin@y", std::string(margin_y_str));
+        }
+        margin_y_str.remove_prefix(n_spaces_to_trim);
+        margin_x = stringViewToFloat(margin_x_str, "margin@x");
+        margin_y = stringViewToFloat(margin_y_str, "margin@y");
+        if (rank_dir.m_is_sideways) {
+            std::swap(margin_x, margin_y);
+        }
+    } else {
+        const float margin = getAttrTransformedCheckedOrDefault(m_attrs, "margin", 0.11f, stringViewToFloat);
+        margin_x = margin;
+        margin_y = margin;
+    }
     const std::string_view shape = getAttrOrDefault(m_attrs, "shape", default_shape);
     const float pen_width = getAttrTransformedCheckedOrDefault(m_attrs, "penwidth", 1.0f, stringViewToFloat);
     constexpr size_t dpi = DEFAULT_DPI; // TODO handle custom DPI settings
@@ -52,20 +71,23 @@ void Node::populateRenderInfo(render::glyph::GlyphLoader &glyph_loader, const Ra
     size_t max_line_width, y;
     populateGlyphQuadsWithText(text, font_size, ta, glyph_loader, m_render_attrs.m_quads, max_line_width, y, rank_dir);
 
-    assert(shape == "none" || shape == "box" || shape == "rect" || shape == "ellipse" || shape == "circle");
+    assert(
+        shape == "none" || shape == "box" || shape == "rect" || shape == "ellipse" || shape == "circle" || shape ==
+        "pill");
 
     auto border_thickness = static_cast<size_t>(pen_width * static_cast<float>(dpi) / static_cast<float>(DEFAULT_DPI));
     if (shape == "none") {
         border_thickness = 0;
     }
     // how much to adjust the width and height by based on border thickness.
-    // TODO adjust for non-rectangular shapes
     const auto border_thickness_size_adjustment = 2 * border_thickness;
 
     // add padding around the text
-    m_render_attrs.m_width = static_cast<size_t>(std::round(static_cast<float>(max_line_width) * (1.0f + margin))) +
+    m_render_attrs.m_width = static_cast<size_t>(std::round(
+                                 static_cast<float>(max_line_width) + margin_x * static_cast<float>(DEFAULT_DPI))) +
                              border_thickness_size_adjustment;
-    m_render_attrs.m_height = static_cast<size_t>(std::round(static_cast<float>(y) * (1.0f + margin))) +
+    m_render_attrs.m_height = static_cast<size_t>(std::round(
+                                  static_cast<float>(y) + margin_y * static_cast<float>(DEFAULT_DPI))) +
                               border_thickness_size_adjustment;
     m_render_attrs.m_border_thickness = border_thickness;
 
@@ -77,7 +99,7 @@ void Node::populateRenderInfo(render::glyph::GlyphLoader &glyph_loader, const Ra
     size_t offset_x = (m_render_attrs.m_width - max_line_width) / 2;
     size_t offset_y = (m_render_attrs.m_height - y) / 2;
 
-    if (shape == "box" || shape == "rect" || shape == "ellipse" || shape == "circle") {
+    if (shape == "box" || shape == "rect" || shape == "ellipse" || shape == "circle" || shape == "pill") {
         if (offset_x < min_padding) {
             m_render_attrs.m_width += 2 * (min_padding - offset_x);
             offset_x = min_padding;

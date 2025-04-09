@@ -1,7 +1,6 @@
 #include "punkt/dot.hpp"
 #include "punkt/gl_renderer.hpp"
 #include "punkt/gl_error.hpp"
-#include "punkt/int_types.hpp"
 
 #include <glad/glad.h>
 
@@ -53,6 +52,12 @@ glyph::GlyphCharInfo transformGciForZoom(const glyph::GlyphCharInfo &gci, double
     return glyph::GlyphCharInfo(gci.c, tex_size);
 }
 
+static void resetGLState() {
+    GL_CHECK(glBindVertexArray(0));
+    GL_CHECK(glBindTexture(GL_TEXTURE_2D, 0));
+    GL_CHECK(glUseProgram(0));
+}
+
 // TODO spline edges
 void GLRenderer::renderFrame() {
     GL_CHECK(glClear(GL_COLOR_BUFFER_BIT));
@@ -83,30 +88,36 @@ void GLRenderer::renderFrame() {
     GL_CHECK(glBindVertexArray(m_node_quad_buffer));
     GL_CHECK(glDrawArraysInstanced(GL_POINTS, 0, 1, static_cast<GLsizei>(m_node_quads.size())));
 
-    glBindVertexArray(0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glUseProgram(0);
+    resetGLState();
 
-    // draw edges
-    GL_CHECK(glUseProgram(m_edges_shader));
-    GL_CHECK(glUniform2f(glGetUniformLocation(m_edges_shader, "viewport_size"), static_cast<GLfloat>(m_viewport_w),
-        static_cast<GLfloat>(m_viewport_h)));
-    GL_CHECK(glUniform2f(glGetUniformLocation(m_edges_shader, "camera_pos"), static_cast<GLfloat>(m_camera_x),
-        static_cast<GLfloat>(m_camera_y)));
-    GL_CHECK(glUniform1f(glGetUniformLocation(m_edges_shader, "zoom"), m_zoom));
-    GL_CHECK(
-        glUniform1i(glGetUniformLocation(m_edges_shader, "is_reversed"), static_cast<GLint>(m_dg.m_render_attrs.
-            m_rank_dir.m_is_reversed)));
-    GL_CHECK(
-        glUniform1i(glGetUniformLocation(m_edges_shader, "is_sideways"), static_cast<GLint>(m_dg.m_render_attrs.
-            m_rank_dir.m_is_sideways)));
+    for (const bool is_splines_pass: {false, true}) {
+        // draw edges
+        if (is_splines_pass) {
+            GL_CHECK(glUseProgram(m_edge_splines_shader));
+        } else {
+            GL_CHECK(glUseProgram(m_edges_shader));
+        }
+        GL_CHECK(glUniform2f(glGetUniformLocation(m_edges_shader, "viewport_size"),
+            static_cast<GLfloat>(m_viewport_w), static_cast<GLfloat>(m_viewport_h)));
+        GL_CHECK(glUniform2f(glGetUniformLocation(m_edges_shader, "camera_pos"),
+            static_cast<GLfloat>(m_camera_x), static_cast<GLfloat>(m_camera_y)));
+        GL_CHECK(glUniform1f(glGetUniformLocation(m_edges_shader, "zoom"), m_zoom));
+        GL_CHECK(glUniform1i(glGetUniformLocation(m_edges_shader, "is_reversed"),
+            static_cast<GLint>(m_dg.m_render_attrs.m_rank_dir.m_is_reversed)));
+        GL_CHECK(glUniform1i(glGetUniformLocation(m_edges_shader, "is_sideways"),
+            static_cast<GLint>(m_dg.m_render_attrs.m_rank_dir.m_is_sideways)));
 
-    GL_CHECK(glBindVertexArray(m_edge_lines_buffer));
-    GL_CHECK(glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(m_edge_line_points.size())));
+        if (is_splines_pass) {
+            GL_CHECK(glBindVertexArray(m_edge_splines_buffer));
+            GL_CHECK(glDrawArraysInstanced(GL_POINTS, 0, static_cast<GLsizei>(m_edge_spline_points.size()),
+                n_spline_divisions));
+        } else {
+            GL_CHECK(glBindVertexArray(m_edge_lines_buffer));
+            GL_CHECK(glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(m_edge_line_points.size())));
+        }
 
-    glBindVertexArray(0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glUseProgram(0);
+        resetGLState();
+    }
 
     // draw arrows
     GL_CHECK(glUseProgram(m_arrows_shader));
@@ -125,9 +136,7 @@ void GLRenderer::renderFrame() {
     GL_CHECK(glBindVertexArray(m_arrow_triangles_buffer));
     GL_CHECK(glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(m_edge_arrow_triangles.size())));
 
-    glBindVertexArray(0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glUseProgram(0);
+    resetGLState();
 
     // preload all glyphs (glyph loader, for efficiency, requires us to put it into loading mode, where it messes with
     // our opengl context, and thus we have to separate this out into a preloading stage). This may look weird because
@@ -176,9 +185,7 @@ void GLRenderer::renderFrame() {
         glBindVertexArray(0);
     }
 
-    glBindVertexArray(0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glUseProgram(0);
+    resetGLState();
 
     GL_CRITICAL_CHECK_ALL_ERRORS();
 }

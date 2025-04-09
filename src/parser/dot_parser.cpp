@@ -1,8 +1,8 @@
 #include "punkt/dot.hpp"
 #include "punkt/dot_tokenizer.hpp"
-#include "punkt/utils.hpp"
+#include "punkt/utils/utils.hpp"
+#include "punkt/utils/int_types.hpp"
 #include "punkt/dot_constants.hpp"
-#include "punkt/int_types.hpp"
 
 #include <utility>
 #include <array>

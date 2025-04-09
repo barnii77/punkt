@@ -159,29 +159,26 @@ function(resolve_shader_includes SHADER_CONTENT OUTPUT_VAR)
     set(${OUTPUT_VAR} "${SHADER_CONTENT}" PARENT_SCOPE)
 endfunction()
 
-function(add_shader_pair_to_shader_header_content NAME)
-    set(shader_path "${SHADER_SOURCE_DIR}/${NAME}.vert")
-    file(READ "${shader_path}" vertex_shader_content)
-    resolve_shader_includes("${vertex_shader_content}" vertex_shader_content)
-    escape_string("${vertex_shader_content}" vertex_shader_content)
-
-    set(shader_path "${SHADER_SOURCE_DIR}/${NAME}.geom")
+function(get_shader_var_value NAME EXT OUT_VAR)
+    set(shader_path "${SHADER_SOURCE_DIR}/${NAME}.${EXT}")
     if (EXISTS "${shader_path}")
-        file(READ "${shader_path}" geometry_shader_content)
-        resolve_shader_includes("${geometry_shader_content}" geometry_shader_content)
-        escape_string("${geometry_shader_content}" geometry_shader_content)
-        set(geometry_shader_value "\"${geometry_shader_content}\"")
+        file(READ "${shader_path}" shader_content)
+        resolve_shader_includes("${shader_content}" shader_content)
+        escape_string("${shader_content}" shader_content)
+        set(shader_value "\"${shader_content}\"")
     else ()
-        set(geometry_shader_value "nullptr")
+        set(shader_value "nullptr")
     endif ()
+    set(${OUT_VAR} "${shader_value}" PARENT_SCOPE)
+endfunction()
 
-    set(shader_path "${SHADER_SOURCE_DIR}/${NAME}.frag")
-    file(READ "${shader_path}" fragment_shader_content)
-    resolve_shader_includes("${fragment_shader_content}" fragment_shader_content)
-    escape_string("${fragment_shader_content}" fragment_shader_content)
+function(add_shader_pair_to_shader_header_content NAME)
+    get_shader_var_value("${NAME}" vert vertex_shader_value)
+    get_shader_var_value("${NAME}" geom geometry_shader_value)
+    get_shader_var_value("${NAME}" frag fragment_shader_value)
 
     string(REPLACE "/" "_" VAR_NAME "${NAME}")
-    string(APPEND SHADER_HEADER_CONTENT "static const char *${VAR_NAME}_vertex_shader_code = \"${vertex_shader_content}\";\nstatic const char *${VAR_NAME}_geometry_shader_code = ${geometry_shader_value};\nstatic const char *${VAR_NAME}_fragment_shader_code = \"${fragment_shader_content}\";\n")
+    string(APPEND SHADER_HEADER_CONTENT "static const char *${VAR_NAME}_vertex_shader_code = ${vertex_shader_value};\nstatic const char *${VAR_NAME}_geometry_shader_code = ${geometry_shader_value};\nstatic const char *${VAR_NAME}_fragment_shader_code = ${fragment_shader_value};\n")
     set(SHADER_HEADER_CONTENT "${SHADER_HEADER_CONTENT}" PARENT_SCOPE)
 endfunction()
 
@@ -191,6 +188,7 @@ function(generate_shader_code_header)
     add_shader_pair_to_shader_header_content(nodes)
     add_shader_pair_to_shader_header_content(chars)
     add_shader_pair_to_shader_header_content(edges)
+    add_shader_pair_to_shader_header_content(edges_bezier)
     add_shader_pair_to_shader_header_content(arrows)
 
     file(GENERATE
@@ -261,19 +259,19 @@ add_library(punkt
         src/renderer/gl_renderer.cpp
 
         # header files
-        include/punkt/punkt.h
+        include/punkt/api/punkt.h
         include/punkt/dot.hpp
-        include/punkt/int_types.hpp
         include/punkt/dot_tokenizer.hpp
-        include/punkt/utils.hpp
+        include/punkt/utils/int_types.hpp
+        include/punkt/utils/utils.hpp
         include/punkt/dot_constants.hpp
-        include/punkt/populate_glyph_quads_with_text.hpp
         include/punkt/gl_renderer.hpp
         include/punkt/gl_error.hpp
         include/punkt/glyph_loader/glyph_loader.hpp
         include/punkt/glyph_loader/default_font_resources.hpp
         include/punkt/glyph_loader/psf1_loader.hpp
         include/punkt/layout/common.hpp
+        include/punkt/layout/populate_glyph_quads_with_text.hpp
 )
 target_include_directories(punkt PRIVATE include/)
 target_include_directories(punkt PRIVATE ${GENERATED_PARENT_DIR})

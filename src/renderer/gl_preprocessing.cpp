@@ -1,9 +1,9 @@
 #include "punkt/dot.hpp"
 #include "punkt/gl_renderer.hpp"
 #include "punkt/gl_error.hpp"
-#include "punkt/utils.hpp"
+#include "punkt/utils/utils.hpp"
+#include "punkt/utils/int_types.hpp"
 #include "punkt/dot_constants.hpp"
-#include "punkt/int_types.hpp"
 #include "generated/punkt/shaders/shaders.hpp"
 
 #include <ranges>
@@ -12,7 +12,53 @@
 #include <cmath>
 #include <numbers>
 
+using namespace punkt;
 using namespace punkt::render;
+
+static GLuint getPackedColorFromAttrs(const Attrs &attrs, const std::string_view attr_name,
+                                      const std::string_view default_value) {
+    const std::string_view &font_color_str = attrs.contains(attr_name) ? attrs.at(attr_name) : default_value;
+    uint8_t r, g, b;
+    parseColor(font_color_str, r, g, b);
+    return (static_cast<GLuint>(r) << 0) | (static_cast<GLuint>(g) << 8) | (static_cast<GLuint>(b) << 16);
+}
+
+constexpr GLuint edge_style_solid = 0;
+constexpr GLuint edge_style_dotted = 1;
+constexpr GLuint edge_style_dashed = 2;
+constexpr GLuint edge_style_bullet = 3;
+
+static GLuint getEdgeStyleId(const std::string_view style) {
+    if (style == "dotted") {
+        return edge_style_dotted;
+    } else if (style == "dashed") {
+        return edge_style_dashed;
+    } else if (style == "bullet") {
+        return edge_style_bullet;
+    }
+    // default to solid if unrecognized
+    return edge_style_solid;
+}
+
+constexpr GLuint node_shape_none = 0;
+constexpr GLuint node_shape_box = 1;
+constexpr GLuint node_shape_ellipse = 2;
+constexpr GLuint node_shape_circle = node_shape_ellipse; // from shader POV there is no difference
+constexpr GLuint node_shape_pill = 3; // this one is punkt-specific
+
+// used in the fragment shader for identifying how to draw the border
+static GLuint getNodeShapeId(const Node &node) {
+    if (const std::string_view &shape = getAttrOrDefault(node.m_attrs, "shape", default_shape); shape == "none") {
+        return node_shape_none;
+    } else if (shape == "ellipse") {
+        return node_shape_ellipse;
+    } else if (shape == "circle") {
+        return node_shape_circle;
+    } else if (shape == "pill") {
+        return node_shape_pill;
+    }
+    return node_shape_box;
+}
 
 CharQuadPerInstanceData::CharQuadPerInstanceData(const GLuint x, const GLuint y, const GLuint color)
     : m_x(x), m_y(y), m_color(color) {
@@ -57,6 +103,14 @@ EdgeLinePoints::EdgeLinePoints(const std::span<const Vector2<size_t>> points, co
     for (size_t i = 0; i < std::size(m_points); i++) {
         const auto [x, y] = points[i];
         m_points[i] = Vector2(static_cast<GLuint>(x), static_cast<GLuint>(y));
+    }
+    if (m_edge_style == edge_style_dotted) {
+        // this value is only required with dotted style
+        m_total_curve_length = static_cast<GLfloat>(bezierCurveLength(m_points[0].x, m_points[0].y, m_points[1].x,
+                                                                      m_points[1].y, m_points[2].x, m_points[2].y,
+                                                                      m_points[3].x, m_points[3].y));
+    } else {
+        m_total_curve_length = 0.0f;
     }
 }
 
@@ -161,6 +215,78 @@ static VAO moveEdgeLinesToBuffer(const std::span<const EdgeLinePoints> edge_line
     GL_CHECK(glEnableVertexAttribArray(6));
     GL_CHECK(glVertexAttribIPointer(6, 1, GL_UNSIGNED_INT,
         static_cast<GLsizei>(sizeof(EdgeLinePoints)), reinterpret_cast<void *>(10 * sizeof(GLuint))));
+
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    return vao;
+}
+
+static VAO moveEdgeSplinesToBuffer(const std::span<const EdgeLinePoints> edge_splines) {
+    GLuint vao, vbo_points, vbo_t;
+    GL_CHECK(glGenVertexArrays(1, &vao));
+    GL_CHECK(glGenBuffers(1, &vbo_points));
+    GL_CHECK(glGenBuffers(1, &vbo_t));
+    GL_CHECK(glBindVertexArray(vao));
+
+    // per vertex data (vbo_points) stores all the base points and style attributes
+    GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, vbo_points));
+
+    GL_CHECK(glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizei>(edge_splines.size() * sizeof(EdgeLinePoints)),
+        edge_splines.data(), GL_STATIC_DRAW));
+
+    GL_CHECK(glEnableVertexAttribArray(0));
+    GL_CHECK(glVertexAttribPointer(0, 2, GL_UNSIGNED_INT, GL_FALSE,
+        static_cast<GLsizei>(sizeof(EdgeLinePoints)), static_cast<void *>(nullptr)));
+
+    GL_CHECK(glEnableVertexAttribArray(1));
+    GL_CHECK(glVertexAttribPointer(1, 2, GL_UNSIGNED_INT, GL_FALSE,
+        static_cast<GLsizei>(sizeof(EdgeLinePoints)), reinterpret_cast<void *>(2 * sizeof(GLuint))));
+
+    GL_CHECK(glEnableVertexAttribArray(2));
+    GL_CHECK(glVertexAttribPointer(2, 2, GL_UNSIGNED_INT, GL_FALSE,
+        static_cast<GLsizei>(sizeof(EdgeLinePoints)), reinterpret_cast<void *>(4 * sizeof(GLuint))));
+
+    GL_CHECK(glEnableVertexAttribArray(3));
+    GL_CHECK(glVertexAttribPointer(3, 2, GL_UNSIGNED_INT, GL_FALSE,
+        static_cast<GLsizei>(sizeof(EdgeLinePoints)), reinterpret_cast<void *>(6 * sizeof(GLuint))));
+
+    GL_CHECK(glEnableVertexAttribArray(4));
+    GL_CHECK(glVertexAttribPointer(4, 1, GL_UNSIGNED_INT, GL_FALSE,
+        static_cast<GLsizei>(sizeof(EdgeLinePoints)), reinterpret_cast<void *>(8 * sizeof(GLuint))));
+
+    GL_CHECK(glEnableVertexAttribArray(5));
+    GL_CHECK(glVertexAttribIPointer(5, 1, GL_UNSIGNED_INT,
+        static_cast<GLsizei>(sizeof(EdgeLinePoints)), reinterpret_cast<void *>(9 * sizeof(GLuint))));
+
+    GL_CHECK(glEnableVertexAttribArray(6));
+    GL_CHECK(glVertexAttribIPointer(6, 1, GL_UNSIGNED_INT,
+        static_cast<GLsizei>(sizeof(EdgeLinePoints)), reinterpret_cast<void *>(10 * sizeof(GLuint))));
+
+    GL_CHECK(glEnableVertexAttribArray(7));
+    GL_CHECK(glVertexAttribPointer(7, 1, GL_FLOAT, GL_FALSE,
+        static_cast<GLsizei>(sizeof(EdgeLinePoints)), reinterpret_cast<void *>(11 * sizeof(GLuint))));
+
+    // per instance data is just the `t` value used for bezier interpolation
+    GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, vbo_t));
+
+    GLfloat t_values[n_spline_divisions + 1];
+    for (size_t i = 0; i <= n_spline_divisions; i++) {
+        constexpr auto denom = static_cast<GLfloat>(n_spline_divisions);
+        t_values[i] = static_cast<GLfloat>(i) / denom;
+    }
+    GL_CHECK(glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizei>(sizeof(t_values)), t_values, GL_STATIC_DRAW));
+
+    GL_CHECK(glEnableVertexAttribArray(8));
+    GL_CHECK(glVertexAttribPointer(8, 1, GL_FLOAT, GL_FALSE, static_cast<GLsizei>(sizeof(GLfloat)),
+        static_cast<void *>(nullptr)));
+    GL_CHECK(glVertexAttribDivisor(8, 1));
+
+    // the stride here is not a mistake, attr 9 `t_next` overlaps with the values of attr 8 `t`, just offset by 1
+    GL_CHECK(glEnableVertexAttribArray(9));
+    GL_CHECK(glVertexAttribPointer(9, 1, GL_FLOAT, GL_FALSE, static_cast<GLsizei>(sizeof(GLfloat)),
+        reinterpret_cast<void *>(sizeof(GLfloat))));
+    GL_CHECK(glVertexAttribDivisor(9, 1));
 
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -308,58 +434,12 @@ static GLuint createShaderProgram(const char *vertex_shader_code, const char *ge
     return program;
 }
 
-static GLuint getPackedColorFromAttrs(const punkt::Attrs &attrs, const std::string_view attr_name,
-                                      const std::string_view default_value) {
-    const std::string_view &font_color_str = attrs.contains(attr_name) ? attrs.at(attr_name) : default_value;
-    uint8_t r, g, b;
-    punkt::parseColor(font_color_str, r, g, b);
-    return (static_cast<GLuint>(r) << 0) | (static_cast<GLuint>(g) << 8) | (static_cast<GLuint>(b) << 16);
-}
-
-constexpr GLuint style_solid = 0;
-constexpr GLuint style_dotted = 1;
-constexpr GLuint style_dashed = 2;
-constexpr GLuint style_bullet = 3;
-
-static GLuint getStyleId(const std::string_view style) {
-    if (style == "dotted") {
-        return style_dotted;
-    } else if (style == "dashed") {
-        return style_dashed;
-    } else if (style == "bullet") {
-        return style_bullet;
-    }
-    // default to solid if unrecognized
-    return style_solid;
-}
-
-constexpr GLuint node_shape_none = 0;
-constexpr GLuint node_shape_box = 1;
-constexpr GLuint node_shape_ellipse = 2;
-constexpr GLuint node_shape_circle = node_shape_ellipse; // from shader POV there is no difference
-
-// used in the fragment shader for identifying how to draw the border
-static GLuint getNodeShapeId(const punkt::Node &node) {
-    // TODO handle more shapes
-    if (const std::string_view &shape = getAttrOrDefault(node.m_attrs, "shape", default_shape); shape == "none") {
-        return node_shape_none;
-    } else if (shape == "box" || shape == "rect") {
-        return node_shape_box;
-    } else if (shape == "ellipse") {
-        return node_shape_ellipse;
-    } else if (shape == "circle") {
-        return node_shape_circle;
-    } else {
-        throw punkt::IllegalAttributeException("shape", std::string(shape));
-    }
-}
-
-static void populateRendererCharQuads(const std::vector<punkt::GlyphQuad> &quads, const size_t x, const size_t y,
+static void populateRendererCharQuads(const std::vector<GlyphQuad> &quads, const size_t x, const size_t y,
                                       const GLuint font_color,
                                       std::unordered_map<glyph::GlyphCharInfo, CharQuadInstanceTracker,
                                           glyph::GlyphCharInfoHasher> &out_char_quads) {
     // build text quads
-    for (const punkt::GlyphQuad &quad: quads) {
+    for (const GlyphQuad &quad: quads) {
         if (!out_char_quads.contains(quad.m_c)) {
             out_char_quads.insert_or_assign(
                 quad.m_c, CharQuadInstanceTracker(quad.m_right - quad.m_left, quad.m_bottom - quad.m_top));
@@ -442,7 +522,7 @@ GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
             assert(edge.m_render_attrs.m_trajectory.size() == expected_edge_line_length);
 
             const GLuint edge_color = getPackedColorFromAttrs(edge.m_attrs, "color", "black");
-            const GLuint edge_style = getStyleId(getAttrOrDefault(edge.m_attrs, "style", "solid"));
+            const GLuint edge_style = getEdgeStyleId(getAttrOrDefault(edge.m_attrs, "style", "solid"));
 
             const float edge_pen_width = getAttrTransformedCheckedOrDefault(
                 edge.m_attrs, "penwidth", 1.0f, stringViewToFloat);
@@ -451,7 +531,30 @@ GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
             const auto edge_thickness = static_cast<GLuint>(
                 edge_pen_width * static_cast<float>(dpi) / static_cast<float>(DEFAULT_DPI));
 
-            m_edge_line_points.emplace_back(edge.m_render_attrs.m_trajectory, edge_color, edge_thickness, edge_style);
+            bool render_as_spline = false;
+            // only render as spline if that is enabled obviously
+            if (edge.m_render_attrs.m_is_spline) {
+                const Node &src = dg.m_nodes.at(edge.m_source);
+                const Node &dest = dg.m_nodes.at(edge.m_dest);
+                const auto source_rank_height = dg.m_render_attrs.m_rank_render_attrs.at(src.m_render_attrs.m_rank).
+                        m_rank_height;
+                const auto dest_rank_height = dg.m_render_attrs.m_rank_render_attrs.at(dest.m_render_attrs.m_rank).
+                        m_rank_height;
+                // only render as spline if rendering as a spline makes a difference visually (splines are expensive)
+                if (src.m_render_attrs.m_height < source_rank_height ||
+                    dest.m_render_attrs.m_height < dest_rank_height || getNodeShapeId(src) != node_shape_box ||
+                    getNodeShapeId(dest) != node_shape_box) {
+                    render_as_spline = true;
+                }
+            }
+
+            if (render_as_spline) {
+                m_edge_spline_points.emplace_back(edge.m_render_attrs.m_trajectory, edge_color, edge_thickness,
+                                                  edge_style);
+            } else {
+                m_edge_line_points.emplace_back(edge.m_render_attrs.m_trajectory, edge_color, edge_thickness,
+                                                edge_style);
+            }
 
             buildArrows(edge, edge_color);
 
@@ -470,6 +573,7 @@ GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
     m_cluster_quads_buffer = moveShapeQuadsToBuffer(m_cluster_quads);
     m_node_quad_buffer = moveShapeQuadsToBuffer(m_node_quads);
     m_edge_lines_buffer = moveEdgeLinesToBuffer(m_edge_line_points);
+    m_edge_splines_buffer = moveEdgeSplinesToBuffer(m_edge_spline_points);
     m_arrow_triangles_buffer = moveArrowTrianglesToBuffer(m_edge_arrow_triangles);
 
     // populate glyph vertex and instance buffers
@@ -489,6 +593,9 @@ GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
                                          chars_fragment_shader_code);
     m_edges_shader = createShaderProgram(edges_vertex_shader_code, edges_geometry_shader_code,
                                          edges_fragment_shader_code);
+    // note the use of the normal fragment shader also used for straight edge rendering
+    m_edge_splines_shader = createShaderProgram(edges_bezier_vertex_shader_code, edges_bezier_geometry_shader_code,
+                                                edges_fragment_shader_code);
     m_arrows_shader = createShaderProgram(arrows_vertex_shader_code, arrows_geometry_shader_code,
                                           arrows_fragment_shader_code);
 
@@ -497,14 +604,14 @@ GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
 
 // determine whether two points for computing the angle of an arrow are too close together and should preferably not
 // be used. Policy: line must be longer than arrow.
-static bool pointsTooCloseToComputeArrowAngle(const punkt::Vector2<size_t> &a, const punkt::Vector2<size_t> &b,
+static bool pointsTooCloseToComputeArrowAngle(const Vector2<size_t> &a, const Vector2<size_t> &b,
                                               const double arrow_size) {
     const auto dx = static_cast<double>(a.x) - static_cast<double>(b.x);
     const auto dy = static_cast<double>(a.y) - static_cast<double>(b.y);
     return dx * dx + dy * dy <= arrow_size * arrow_size;
 }
 
-static double getArrowAngle(const std::span<const punkt::Vector2<size_t>> trajectory, const bool go_backward,
+static double getArrowAngle(const std::span<const Vector2<size_t>> trajectory, const bool go_backward,
                             const double arrow_size) {
     const auto &a = go_backward ? trajectory.back() : trajectory.front();
 
@@ -543,7 +650,7 @@ static double getArrowAngle(const std::span<const punkt::Vector2<size_t>> trajec
                       static_cast<double>(a.x) - static_cast<double>(b.x));
 }
 
-static punkt::Vector2<double> getLineEndPointForArrow(const std::span<const punkt::Vector2<size_t>> trajectory,
+static Vector2<double> getLineEndPointForArrow(const std::span<const Vector2<size_t>> trajectory,
                                                       const bool get_min, double &orientation,
                                                       const double arrow_size) {
     assert(trajectory.size() == 4);
@@ -551,33 +658,33 @@ static punkt::Vector2<double> getLineEndPointForArrow(const std::span<const punk
         if (get_min) {
             const auto [x, y] = trajectory.front();
             orientation = getArrowAngle(trajectory, false, arrow_size);
-            return punkt::Vector2(static_cast<double>(x), static_cast<double>(y));
+            return Vector2(static_cast<double>(x), static_cast<double>(y));
         } else {
             const auto [x, y] = trajectory.back();
             orientation = getArrowAngle(trajectory, true, arrow_size);
-            return punkt::Vector2(static_cast<double>(x), static_cast<double>(y));
+            return Vector2(static_cast<double>(x), static_cast<double>(y));
         }
     } else {
         if (get_min) {
             const auto [x, y] = trajectory.back();
             orientation = getArrowAngle(trajectory, true, arrow_size);
-            return punkt::Vector2(static_cast<double>(x), static_cast<double>(y));
+            return Vector2(static_cast<double>(x), static_cast<double>(y));
         } else {
             const auto [x, y] = trajectory.front();
             orientation = getArrowAngle(trajectory, false, arrow_size);
-            return punkt::Vector2(static_cast<double>(x), static_cast<double>(y));
+            return Vector2(static_cast<double>(x), static_cast<double>(y));
         }
     }
 }
 
-static void buildArrowTriangles(GLRenderer &renderer, const punkt::Edge &edge, const GLuint edge_color,
+static void buildArrowTriangles(GLRenderer &renderer, const Edge &edge, const GLuint edge_color,
                                 const std::string_view arrow_type, const float arrow_size, const bool is_upward) {
     if (arrow_type == "none") {
         return;
     }
 
     // TODO support more arrow types - for now, every type emits a normal arrow as "fallback"
-    punkt::Vector2<double> points[3]{};
+    Vector2<double> points[3]{};
     // TODO handle custom dpi
     constexpr auto dpi = DEFAULT_DPI;
     const auto arrow_size_pix = arrow_size * arrow_scale * static_cast<float>(dpi) / static_cast<float>(DEFAULT_DPI);
@@ -589,8 +696,8 @@ static void buildArrowTriangles(GLRenderer &renderer, const punkt::Edge &edge, c
         // normal layout grid that other stuff is limited to position-wise), we have to adjust the x so the arrow is
         // centered inside the grid cell it's at.
         top.x += 0.5;
-        const auto left = punkt::Vector2(top.x - arrow_size_pix / 2, top.y + arrow_size_pix);
-        const auto right = punkt::Vector2(top.x + arrow_size_pix / 2, top.y + arrow_size_pix);
+        const auto left = Vector2(top.x - arrow_size_pix / 2, top.y + arrow_size_pix);
+        const auto right = Vector2(top.x + arrow_size_pix / 2, top.y + arrow_size_pix);
         points[0] = top;
         points[1] = left;
         points[2] = right;
@@ -598,8 +705,8 @@ static void buildArrowTriangles(GLRenderer &renderer, const punkt::Edge &edge, c
     } else {
         auto bottom = getLineEndPointForArrow(edge.m_render_attrs.m_trajectory, false, line_orientation, arrow_size);
         bottom.x += 0.5; // for explanation, see ~10 lines above
-        const auto left = punkt::Vector2(bottom.x - arrow_size_pix / 2, bottom.y - arrow_size_pix);
-        const auto right = punkt::Vector2(bottom.x + arrow_size_pix / 2, bottom.y - arrow_size_pix);
+        const auto left = Vector2(bottom.x - arrow_size_pix / 2, bottom.y - arrow_size_pix);
+        const auto right = Vector2(bottom.x + arrow_size_pix / 2, bottom.y - arrow_size_pix);
         points[0] = bottom;
         points[1] = left;
         points[2] = right;

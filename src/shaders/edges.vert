@@ -9,9 +9,11 @@ layout (location = 4) in float edge_thickness;
 layout (location = 5) in uint edge_color_packed;
 layout (location = 6) in uint edge_style;
 
+#define NVERT 4
+
 out VS_OUT {
     vec4 edge_color;
-    vec2 vertices[4];
+    vec2 vertices[NVERT];
     float edge_thickness;
     uint edge_style;
 } vs_out;

@@ -1,4 +1,4 @@
-#include "punkt/punkt.h"
+#include "punkt/api/punkt.h"
 
 #include <string>
 #include <fstream>
@@ -40,8 +40,11 @@ static std::string readInputFile(const char *path) {
 }
 
 int main() {
-    const char *path = "examples/graphviz_gallery/ninja.dot";
-    path = "examples/demo5.dot";
+    const char *path = "examples/graphviz_gallery/siblings.dot";
+    // path = "examples/demo_inheritance.dot";
+    // path = "examples/graphviz_gallery/ninja.dot";
+    // path = "examples/demo3.dot";
+    // path = "examples/demo8.dot";
     const std::string test_input = readInputFile(path);
     const auto font_path = "resources/fonts/tinyfont.psf";
     punktRun(test_input.data(), font_path);
@@ -49,26 +52,20 @@ int main() {
 
 ////////////////////// TODOS //////////////////////
 
-// TODO in optimize_node_x_positions.cpp, I have a todo where I have to recompute graph layout after node optimization
-    // I should move part of that computation after optimization (or twice if I want to do the rejection from below)
+// TODO the current pipeline only works for simple graphs... I need to rework this most likely in a way that optimizes
+// much more effectively on large graphs...
+// TODO maybe I should introduce node weights in group sweep (i.e. give ghost nodes very little influence)
+// TODO maybe if I simply let the x optimization determine the rank ordering as well that could lead to better results?
+    // would be aware of node widths, however, couldn't do the bubble reordering
+        // maybe I should combine my current orderer with this so the x opt determines order but seeded with the order
+        // produced by the naive barycenter ordering and bubble reordering?
+// TODO update unit tests - they don't work anymore (5 fail)
+// TODO should I add de-cycling to the rank assignment as a preliminary step like graphviz does?
+// TODO re-route edge trajectories so they go into the arrow tail instead
 // TODO I have a massive antialiasing problem
-// TODO should I only apply pull towards mean in x opt to groups, but not individual nodes?
-    // if I do that, make sure to weight the groups by group size
-        // I feel like the pull should be stronger in more dense ranks in general and should be weaker (not stronger as
-        // it currently unintentionally is) in sparse ranks. See ninja.dot for why
-// TODO I think I have a bug where the x optimization will actually position nodes at (rank+1) slightly to
-// right/down compared to where they should actually be... would explain the fact demo2.dot and the ninja.dot example
-// are so weird (by which I mean that there are no straight edges where there should be straight edges and more iters
-// do not help)
-// TODO test the stability of my x optimization
-    // TODO figure out why it explodes with examples/demo3.dot without regularization and pull towards mean
-    // TODO should I bound it? (e.g. 2 * graph_dims)
-// TODO handle spline edges
-// TODO do something with x optimization (optimize_node_x_positions.cpp) to incentivise straight lines slightly more
-// TODO maybe add something that rates the x positioning before and after x optimization and discards the optimization
-// results in favor of the initial positioning if the score is worse? It seems the barycenter x positioning better only
-// on some graphs, not universally better.
 // TODO adapt the GLRenderer so that I can use it for clusters, i.e. with multiple digraphs at once
+    // TODO though I should probably just write out the glyph quads of the cluster into the glyph quads of the parent
+    // graph right before rendering (after x optimization and stuff)
 // TODO a cluster should become a single super-node when doing all my layout computations. This means it is literally
 // treated as a single (giant) node with special attributes (@type = "cluster", @code = <string_view into the graph
 // source defining the cluster>) and assigned a single rank. Once we have computed the horizontal orderings, we convert

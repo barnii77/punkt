@@ -1,5 +1,5 @@
 #include "punkt/dot.hpp"
-#include "punkt/populate_glyph_quads_with_text.hpp"
+#include "punkt/layout/populate_glyph_quads_with_text.hpp"
 
 #include <ranges>
 #include <algorithm>
@@ -81,16 +81,10 @@ void punkt::populateGlyphQuadsWithText(const std::string_view &text, const size_
                 gq.m_left += adjustment;
                 gq.m_right += adjustment;
             }
-            if (rank_dir.m_is_reversed) {
-                if (rank_dir.m_is_sideways) {
-                    const size_t left = out_max_line_width - gq.m_top, right = out_max_line_width - gq.m_bottom;
-                    gq.m_top = right;
-                    gq.m_bottom = left;
-                } else {
-                    const size_t top = out_height - gq.m_left, bottom = out_height - gq.m_right;
-                    gq.m_left = bottom;
-                    gq.m_right = top;
-                }
+            if (rank_dir.m_is_reversed && rank_dir.m_is_sideways) {
+                const size_t left = out_max_line_width - gq.m_top, right = out_max_line_width - gq.m_bottom;
+                gq.m_top = right;
+                gq.m_bottom = left;
             }
         }
     }

@@ -1,5 +1,5 @@
 #include "punkt/dot.hpp"
-#include "punkt/int_types.hpp"
+#include "punkt/utils/int_types.hpp"
 #include <gtest/gtest.h>
 #include <string>
 #include <vector>

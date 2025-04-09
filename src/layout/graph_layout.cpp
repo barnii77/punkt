@@ -1,7 +1,7 @@
 #include "punkt/dot.hpp"
-#include "punkt/utils.hpp"
+#include "punkt/utils/utils.hpp"
 #include "punkt/dot_constants.hpp"
-#include "punkt/populate_glyph_quads_with_text.hpp"
+#include "punkt/layout/populate_glyph_quads_with_text.hpp"
 
 #include <ranges>
 #include <algorithm>
@@ -26,8 +26,7 @@ static void populateGraphLabelText(const Attrs &attrs, const TextAlignment label
     }
 }
 
-void Digraph::computeGraphLayout(render::glyph::GlyphLoader &glyph_loader, const size_t graph_x,
-                                 const size_t graph_y) {
+void Digraph::computeGraphLayout(render::glyph::GlyphLoader &glyph_loader, const size_t graph_x, const size_t graph_y) {
     m_render_attrs.m_graph_x = graph_x;
     m_render_attrs.m_graph_y = graph_y;
     m_render_attrs.m_rank_sep = getAttrTransformedCheckedOrDefault(m_attrs, "ranksep", default_rank_sep,

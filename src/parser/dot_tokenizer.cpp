@@ -5,6 +5,7 @@
 #include <unordered_set>
 #include <cassert>
 
+using namespace punkt;
 using namespace punkt::tokenizer;
 
 static std::unordered_set<std::string_view> keywords = {
@@ -89,11 +90,11 @@ std::vector<Token> punkt::tokenizer::tokenize(Digraph &dg, std::string_view s) {
                 throw UnexpectedCharException(c);
             }
             advance_by = 2;
-        } else if (c == '/') {
-            if (s.length() < 2 || (c = s.at(1)) != '/') {
+        } else if (c == '/' || c == '#') {
+            if (c == '/' && (s.length() < 2 || (c = s.at(1)) != '/')) {
                 throw UnexpectedCharException(c);
             }
-            advance_by = 2;
+            advance_by = c == '/' ? 2 : 1;
             // advance until newline
             while (advance_by < s.length() && s.at(advance_by) != '\n') {
                 advance_by++;

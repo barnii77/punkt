@@ -1,5 +1,5 @@
 #include "punkt/dot.hpp"
-#include "punkt/utils.hpp"
+#include "punkt/utils/utils.hpp"
 
 #include <algorithm>
 #include <map>

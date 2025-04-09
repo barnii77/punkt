@@ -1,4 +1,4 @@
-#include "punkt/int_types.hpp"
+#include "punkt/utils/int_types.hpp"
 #include "punkt/glyph_loader/psf1_loader.hpp"
 
 #include <vector>

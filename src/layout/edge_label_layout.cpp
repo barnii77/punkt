@@ -1,7 +1,7 @@
 #include "punkt/dot.hpp"
-#include "punkt/populate_glyph_quads_with_text.hpp"
-#include "punkt/utils.hpp"
-#include "punkt/int_types.hpp"
+#include "punkt/layout/populate_glyph_quads_with_text.hpp"
+#include "punkt/utils/utils.hpp"
+#include "punkt/utils/int_types.hpp"
 
 #include <ranges>
 #include <cassert>
@@ -26,12 +26,12 @@ static Vector2<size_t> getLineCenter(const std::span<const Vector2<size_t>> traj
     const auto x1 = static_cast<ssize_t>(x1u), y1 = static_cast<ssize_t>(y1u), x2 = static_cast<ssize_t>(x2u), y2 =
             static_cast<ssize_t>(y2u);
     if (is_spline) {
-        // TODO evaluate the spline function at t = 0.5
-        const auto [dx, dy] = Vector2(static_cast<ssize_t>(x2) - static_cast<ssize_t>(x1),
-                                      static_cast<ssize_t>(y2) - static_cast<ssize_t>(y1));
-        const size_t x = static_cast<size_t>(std::max(x1 + dx / 2, 0ll));
-        const size_t y = static_cast<size_t>(std::max(y1 + dy / 2, 0ll));
-        return Vector2(x, y);
+        double x, y;
+        evaluateBezier(0.5, static_cast<double>(trajectory[0].x), static_cast<double>(trajectory[0].y),
+                       static_cast<double>(trajectory[1].x), static_cast<double>(trajectory[1].y),
+                       static_cast<double>(trajectory[2].x), static_cast<double>(trajectory[2].y),
+                       static_cast<double>(trajectory[3].x), static_cast<double>(trajectory[3].y), x, y);
+        return Vector2(static_cast<size_t>(std::round(x)), static_cast<size_t>(std::round(y)));
     } else {
         const auto [dx, dy] = Vector2(static_cast<ssize_t>(x2) - static_cast<ssize_t>(x1),
                                       static_cast<ssize_t>(y2) - static_cast<ssize_t>(y1));
@@ -75,9 +75,7 @@ void Digraph::computeEdgeLabelLayouts(render::glyph::GlyphLoader &glyph_loader) 
                 populateGlyphQuadsWithText(label, font_size, TextAlignment::center, glyph_loader,
                                            edge.m_render_attrs.m_label_quads, max_line_width, height,
                                            m_render_attrs.m_rank_dir);
-                // TODO make the default value of `splines` true once they are done
-                const Vector2 center = getLineCenter(edge.m_render_attrs.m_trajectory,
-                                                     getAttrOrDefault(m_attrs, "splines", "false") != "false");
+                const Vector2 center = getLineCenter(edge.m_render_attrs.m_trajectory, edge.m_render_attrs.m_is_spline);
                 const ssize_t x_dir_dependent_offset = destination.m_render_attrs.m_x < node.m_render_attrs.m_x
                                                            ? -static_cast<ssize_t>(font_size)
                                                            : static_cast<ssize_t>(font_size);

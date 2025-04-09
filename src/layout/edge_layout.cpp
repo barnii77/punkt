@@ -1,11 +1,12 @@
 #include "punkt/dot.hpp"
-#include "punkt/utils.hpp"
+#include "punkt/utils/utils.hpp"
 #include "punkt/dot_constants.hpp"
-#include "punkt/int_types.hpp"
+#include "punkt/utils/int_types.hpp"
 
 #include <vector>
 #include <type_traits>
 #include <algorithm>
+#include <ranges>
 #include <cassert>
 #include <cmath>
 #include <numeric>
@@ -41,6 +42,14 @@ static float getEllipseHeightAt(const Node &node, float x) {
     return b * std::sqrt(1.0f - x * x / (a * a));
 }
 
+static float getCircleHeightAt(const Node &node, float x) {
+    // `a` is horizontal radius, `b` is vertical radius, `x` is x position in a centered cartesian coordinate system
+    const auto r = std::max(static_cast<float>(node.m_render_attrs.m_width) / 2.0f,
+                            static_cast<float>(node.m_render_attrs.m_height) / 2.0f);
+    x -= r; // move x E [0, 2r] to [-r, r]
+    return r * std::sqrt(1.0f - x * x / (r * r));
+}
+
 // TODO implement for different shapes
 static size_t getNodeTopHeightAt(const Node &node, const float x) {
     if (const std::string_view shape = getAttrOrDefault(node.m_attrs, "shape", default_shape);
@@ -48,6 +57,10 @@ static size_t getNodeTopHeightAt(const Node &node, const float x) {
         return static_cast<size_t>(std::round(
             static_cast<float>(node.m_render_attrs.m_y) + static_cast<float>(node.m_render_attrs.m_height) / 2.0f -
             getEllipseHeightAt(node, x)));
+    } else if (shape == "circle") {
+        return static_cast<size_t>(std::round(
+            static_cast<float>(node.m_render_attrs.m_y) + static_cast<float>(node.m_render_attrs.m_height) / 2.0f -
+            getCircleHeightAt(node, x)));
     }
     return node.m_render_attrs.m_y;
 }
@@ -59,8 +72,15 @@ static size_t getNodeBottomHeightAt(const Node &node, const float x) {
         return static_cast<size_t>(std::round(
             static_cast<float>(node.m_render_attrs.m_y) + static_cast<float>(node.m_render_attrs.m_height) / 2.0f +
             getEllipseHeightAt(node, x)));
+    } else if (shape == "circle") {
+        return static_cast<size_t>(std::round(
+            static_cast<float>(node.m_render_attrs.m_y) + static_cast<float>(node.m_render_attrs.m_height) / 2.0f +
+            getCircleHeightAt(node, x)));
     }
     return node.m_render_attrs.m_y + node.m_render_attrs.m_height;
+}
+
+static void adjustSelfConnectionSplineEdgeLayout(Edge &edge) {
 }
 
 void Digraph::computeEdgeLayout() {
@@ -137,6 +157,68 @@ void Digraph::computeEdgeLayout() {
                     x += dx;
                 }
             }
+        }
+    }
+
+    for (Node &src: std::views::values(m_nodes)) {
+        for (Edge &edge: src.m_outgoing) {
+            edge.m_render_attrs.m_is_spline = caseInsensitiveEquals(
+                getAttrOrDefault(edge.m_attrs, "splines", "true"), "true");
+            if (!edge.m_render_attrs.m_is_part_of_self_connection || !edge.m_render_attrs.m_is_spline || !edge.
+                m_render_attrs.m_is_visible) {
+                continue;
+            }
+
+            const Node &dest = m_nodes.at(edge.m_dest);
+            bool is_upward;
+            double dy;
+            if (src.m_render_attrs.m_rank < dest.m_render_attrs.m_rank) {
+                is_upward = false;
+                dy = static_cast<double>(dest.m_render_attrs.m_y) - static_cast<double>(
+                         src.m_render_attrs.m_y + src.m_render_attrs.m_height);
+            } else {
+                is_upward = true;
+                dy = static_cast<double>(src.m_render_attrs.m_y) - static_cast<double>(
+                         dest.m_render_attrs.m_y + dest.m_render_attrs.m_height);
+            }
+            const bool is_downward = !is_upward;
+            double dx = self_connection_x_broadening_dx_dy_ratio * dy;
+            auto &p1 = edge.m_render_attrs.m_trajectory[1];
+            auto &p2 = edge.m_render_attrs.m_trajectory[2];
+            Vector2<size_t> *p_to_adjust;
+            if (is_upward && src.m_render_attrs.m_is_ghost) {
+                //   X
+                //   ^
+                //   |
+                // ghost
+                dx = -dx;
+                p_to_adjust = &p2;
+            } else if (is_downward && dest.m_render_attrs.m_is_ghost) {
+                //   X
+                //   |
+                //   v
+                // ghost
+                p_to_adjust = &p2;
+            } else if (is_upward && dest.m_render_attrs.m_is_ghost) {
+                // ghost
+                //   ^
+                //   |
+                //   X
+                p_to_adjust = &p1;
+            } else if (is_downward && src.m_render_attrs.m_is_ghost) {
+                // ghost
+                //   |
+                //   v
+                //   X
+                dx = -dx;
+                p_to_adjust = &p1;
+            } else {
+                assert(false && "unreachable");
+                std::abort();
+            }
+
+            p_to_adjust->x = static_cast<size_t>(std::clamp(static_cast<double>(p_to_adjust->x) + dx, 0.0,
+                                                            static_cast<double>(m_render_attrs.m_graph_width)));
         }
     }
 }

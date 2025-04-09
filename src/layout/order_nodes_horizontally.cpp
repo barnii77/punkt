@@ -1,6 +1,6 @@
 #include "punkt/dot.hpp"
 #include "punkt/dot_constants.hpp"
-#include "punkt/int_types.hpp"
+#include "punkt/utils/int_types.hpp"
 #include "punkt/layout/common.hpp"
 
 #include <vector>
@@ -10,8 +10,9 @@
 using namespace punkt;
 using namespace punkt::layout;
 
-static void barycenterSweepReorderOperator(Digraph &dg, const std::vector<float> &new_barycenters,
-                                           const std::vector<float> &old_barycenters, const size_t rank,
+/// this function has to match the signature given by @code BarycenterSweepOperatorFunc @endcode
+static void barycenterSweepReorderOperator(Digraph &dg, std::vector<float> new_barycenters,
+                                           std::vector<float> old_barycenters, const size_t rank,
                                            bool &out_improvement_found) {
     std::vector<size_t> rearrangement_order(new_barycenters.size());
     for (size_t i = 0; i < rearrangement_order.size(); i++) {
@@ -48,7 +49,7 @@ static bool barycenterIteration(Digraph &dg, const bool is_downward_sweep, const
     bool improvement_found = false;
     float total_change = 0.0f;
     barycenterSweep(dg, is_downward_sweep, improvement_found, total_change, barycenterSweepReorderOperator,
-                    BARYCENTER_USE_MEDIAN, dampening, false);
+                    BARYCENTER_USE_MEDIAN, dampening);
     const float average_change = total_change / static_cast<float>(dg.m_nodes.size());
     return improvement_found || average_change >= BARYCENTER_MIN_AVERAGE_CHANGE_REQUIRED *
            BARYCENTER_ORDERING_DAMPENING;
@@ -107,13 +108,14 @@ void Digraph::computeHorizontalOrderings() {
     for (size_t rank = 0; rank < rank_scores.size(); rank++) {
         rank_scores[rank] = getRankOrderingScore(*this, rank);
     }
-    for (ssize_t i = 0; i < BUBBLE_ORDERING_MAX_ITERS || BUBBLE_ORDERING_MAX_ITERS < 0; i++) {
+    for (ssize_t bubble_ordering_iter = 0; bubble_ordering_iter < BUBBLE_ORDERING_MAX_ITERS ||
+                                           BUBBLE_ORDERING_MAX_ITERS < 0; bubble_ordering_iter++) {
         // iterate until no changes improve the score anymore (or until iteration limit is reached)
         bool improvement_found = false;
         // each iteration, we loop over every rank and every node in each rank in order and try to swap it with its
         // neighbour to the right. If that improves the score, we keep the change, otherwise, we discard it.
         for (size_t rank = 0; rank < m_per_rank_orderings.size(); rank++) {
-            rank_scores[i] = getRankOrderingScore(*this, rank);
+            rank_scores[rank] = getRankOrderingScore(*this, rank);
 
             for (size_t node_idx = 0; node_idx < m_per_rank_orderings.at(rank).size() - 1; node_idx++) {
                 // save the previous state so I can efficiently revert
