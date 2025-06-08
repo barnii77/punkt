@@ -5,6 +5,9 @@
 #include <ranges>
 #include <string>
 #include <cassert>
+#include <vector>
+#include <utility>
+#include <algorithm>
 #include <optional>
 
 using namespace punkt;
@@ -19,8 +22,8 @@ static std::string_view newGhostNode(Digraph &dg, const size_t rank, std::option
         attrs.insert_or_assign("fillcolor", "black");
     }
 
-    dg.m_generated_sources.push_front(std::move(name));
-    Node ghost(dg.m_generated_sources.front(), std::move(attrs));
+    dg.m_referenced_sources.push_front(std::move(name));
+    Node ghost(dg.m_referenced_sources.front(), std::move(attrs));
     ghost.m_render_attrs.m_rank = rank;
     ghost.m_render_attrs.m_is_ghost = true;
     assert(!dg.m_nodes.contains(ghost.m_name));
@@ -66,7 +69,7 @@ static Attrs getGhostEdgeAttrs(const Attrs &edge_attrs, const size_t edge_num, c
 
 // if necessary, decomposes an edge into multiple other edges connecting ghost nodes
 static void decomposeEdgeIfRequired(Digraph &dg, const std::string_view source_name, const std::string_view dest_name,
-                                    const size_t edge_idx) {
+                                    const size_t edge_idx, const bool has_top_io_port, const bool has_bottom_io_port) {
     if (const auto rank_diff = static_cast<ssize_t>(
             dg.m_nodes.at(dest_name).m_render_attrs.m_rank - dg.m_nodes.at(source_name).m_render_attrs.m_rank);
         rank_diff != -1 && rank_diff != 1) {
@@ -80,22 +83,64 @@ static void decomposeEdgeIfRequired(Digraph &dg, const std::string_view source_n
         }
 
         if (rank_diff == 0) {
-            // special case handling for when two nodes are on the same rank
+            // Special case handling for when two nodes are on the same rank
             const size_t rank = dg.m_nodes.at(source_name).m_render_attrs.m_rank;
             size_t ghost_rank;
             if (rank == 0) {
                 ghost_rank = 1;
                 if (dg.m_rank_counts.size() == 1) {
+                    assert(!has_top_io_port && !has_bottom_io_port);
                     dg.m_rank_counts.resize(2);
+                } else if (dg.m_io_port_ranks.contains(ghost_rank)) {
+                    // Handle the very particular case where I have one rank with self-links and the rank *below*, which
+                    // is the only other rank, is an IO port rank and must not be used for ghost node placement.
+                    // Fix: Insert a rank below the current rank to act as a ghost rank.
+                    assert(dg.m_io_port_ranks.size() == 1 && has_bottom_io_port && dg.m_rank_counts.size() == 2);
+                    dg.m_rank_counts.resize(3);
+                    std::swap(dg.m_rank_counts[1], dg.m_rank_counts[2]);
+                    for (Node &n: std::views::values(dg.m_nodes)) {
+                        if (n.m_render_attrs.m_rank == ghost_rank) {
+                            n.m_render_attrs.m_rank++;
+                        }
+                    }
                 }
             } else if (rank == dg.m_rank_counts.size() - 1) {
+                assert(dg.m_rank_counts.size() >= 2);
                 ghost_rank = dg.m_rank_counts.size() - 2;
+                if (dg.m_io_port_ranks.contains(ghost_rank)) {
+                    // Handle the very particular case where I have one rank with self-links and the rank *above*, which
+                    // is the only other rank, is an IO port rank and must not be used for ghost node placement.
+                    // Fix: Insert a rank below the current rank to act as a ghost rank.
+                    assert(rank == 1 && dg.m_rank_counts.size() == 2);
+                    dg.m_rank_counts.resize(dg.m_rank_counts.size() + 1);
+                    ghost_rank = dg.m_rank_counts.size() - 1;
+                }
             } else {
-                // this way of deciding where to insert the ghost node will lead to alternating between inserting above
+                // This way of deciding where to insert the ghost node will lead to alternating between inserting above
                 // and below and therefore balances the edges cleanly
                 const size_t position_seed = dg.m_rank_counts.at(rank - 1) + dg.m_rank_counts.at(rank) +
                                              dg.m_rank_counts.at(rank + 1);
-                ghost_rank = position_seed % 2 ? rank - 1 : rank + 1;
+                const ssize_t direction = position_seed % 2 ? -1 : 1;
+                ghost_rank = rank + direction;
+                if (dg.m_io_port_ranks.contains(ghost_rank)) {
+                    ghost_rank = rank - direction;
+                    if (dg.m_io_port_ranks.contains(ghost_rank)) {
+                        // Handle the very particular case where I have three ranks, rank is 1 (in the middle) and above
+                        // and below are both IO ranks not suitable for ghost node placement.
+                        // Fix: Insert a rank below the current rank to act as a ghost rank.
+                        assert(
+                            rank == 1 && dg.m_io_port_ranks.contains(rank - 1) && dg.m_io_port_ranks.contains(rank + 1)
+                            && dg.m_io_port_ranks.size() == 2 && dg.m_rank_counts.size() == 3);
+                        ghost_rank = 2;
+                        dg.m_rank_counts.resize(4);
+                        std::swap(dg.m_rank_counts[2], dg.m_rank_counts[3]);
+                        for (Node &n: std::views::values(dg.m_nodes)) {
+                            if (n.m_render_attrs.m_rank == ghost_rank) {
+                                n.m_render_attrs.m_rank++;
+                            }
+                        }
+                    }
+                }
             }
 
             const std::optional<std::string_view> color = getAttrTransformedOrDefault(
@@ -140,13 +185,18 @@ static void decomposeEdgeIfRequired(Digraph &dg, const std::string_view source_n
 }
 
 void Digraph::insertGhostNodes() {
+    bool has_top_io_port = m_io_port_ranks.contains(0);
+    bool has_bottom_io_port = m_io_port_ranks.size() == 2 || m_io_port_ranks.size() == 1 && !m_io_port_ranks.
+                              contains(0);
+
     auto keys = std::views::keys(m_nodes);
     for (const std::vector real_node_names(keys.begin(), keys.end());
          const std::string_view &name: real_node_names) {
         Node &node = m_nodes.at(name);
         const size_t n_edges = node.m_outgoing.size();
         for (size_t i = 0; i < n_edges; i++) {
-            decomposeEdgeIfRequired(*this, node.m_name, node.m_outgoing[i].m_dest, i);
+            decomposeEdgeIfRequired(*this, node.m_name, node.m_outgoing[i].m_dest, i, has_top_io_port,
+                                    has_bottom_io_port);
         }
     }
 }

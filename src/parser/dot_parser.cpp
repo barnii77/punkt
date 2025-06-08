@@ -12,6 +12,7 @@
 #include <span>
 #include <optional>
 #include <cassert>
+#include <stack>
 
 using namespace punkt;
 
@@ -223,8 +224,8 @@ static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::T
             Node &node = dg.m_nodes.at(node_name);
             std::string constraints = std::string(getAttrOrDefault(node.m_attrs, "@constraints", "")) +
                                       std::to_string(dg.m_rank_constraints.size()) + ";";
-            dg.m_generated_sources.emplace_front(std::move(constraints));
-            node.m_attrs.insert_or_assign("@constraints", dg.m_generated_sources.front());
+            dg.m_referenced_sources.emplace_front(std::move(constraints));
+            node.m_attrs.insert_or_assign("@constraints", dg.m_referenced_sources.front());
         }
         dg.m_rank_constraints.emplace_back(ty.m_value, std::move(constrained_nodes));
     } else if (nextTokenIs(tokens, tokenizer::Token::Type::arrow) ||
@@ -292,34 +293,134 @@ static void consumeStatementAndUpdateDigraph(Digraph &dg, std::span<tokenizer::T
     }
 }
 
+std::string concatTokens(const std::span<tokenizer::Token> tokens) {
+    size_t total_size = 0;
+    for (const auto &token: tokens) {
+        total_size += token.m_value.size();
+    }
+
+    std::string result;
+    result.reserve(total_size);
+    for (const auto &token: tokens) {
+        result += token.m_value;
+    }
+
+    return result;
+}
+
+static bool isLeftParen(const tokenizer::Token &token) {
+    return token.m_type == tokenizer::Token::Type::lcurly || token.m_type == tokenizer::Token::Type::lsq;
+}
+
+static bool isRightParen(const tokenizer::Token &token) {
+    return token.m_type == tokenizer::Token::Type::rcurly || token.m_type == tokenizer::Token::Type::rsq;
+}
+
+static bool isMatchingParenPair(const tokenizer::Token &opening, const tokenizer::Token &closing) {
+    return opening.m_type == tokenizer::Token::Type::lcurly && closing.m_type == tokenizer::Token::Type::rcurly ||
+           opening.m_type == tokenizer::Token::Type::lsq && closing.m_type == tokenizer::Token::Type::rsq;
+}
+
+static bool containsClusterTrueAttr(const std::span<tokenizer::Token> tokens) {
+    return false;
+
+    // TODO clusters are currently not supported... this is WIP code (probably dead forever though)
+    std::stack<tokenizer::Token> parens;
+    tokenizer::Token prev_token{"", tokenizer::Token::Type::eos};
+    tokenizer::Token prev_prev_token{"", tokenizer::Token::Type::eos};
+    for (const auto &token: tokens) {
+        if (isLeftParen(token)) {
+            parens.push(token);
+        } else if (isRightParen(token)) {
+            if (const auto &top = parens.top(); !isMatchingParenPair(top, token)) {
+                throw UnexpectedTokenException(token);
+            }
+            parens.pop();
+        }
+
+        if (parens.empty() &&
+            token.m_type == tokenizer::Token::Type::string && caseInsensitiveEquals(token.m_value, "true") &&
+            prev_token.m_type == tokenizer::Token::Type::equals &&
+            prev_prev_token.m_type == tokenizer::Token::Type::string && prev_prev_token.m_value == "cluster") {
+            // Found the token sequence `cluster` -> `=` -> `true` outside any parentheses, i.e. it is a cluster level
+            // attr. I will assume that it was used in a syntactically correct way. Otherwise, the cluster parser will
+            // throw anyway.
+            return true;
+        }
+
+        prev_prev_token = prev_token;
+        prev_token = token;
+    }
+
+    return false;
+}
+
+static void leakParentNodesInto(Digraph &cluster_dg, const Digraph &dg) {
+    for (const Node &node: std::views::values(dg.m_nodes)) {
+        if (cluster_dg.m_nodes.contains(node.m_name)) {
+            continue;
+        }
+        Attrs leaked_attrs{{"@link", "parent"}, {"@type", "link"}};
+        Node leaked_node{node.m_name, std::move(leaked_attrs)};
+        cluster_dg.m_nodes.insert_or_assign(node.m_name, std::move(leaked_node));
+    }
+}
+
+static void leakClusterNodesInto(Digraph &dg, const Digraph &cluster_dg) {
+    for (const Node &cluster_node: std::views::values(cluster_dg.m_nodes)) {
+        if (dg.m_nodes.contains(cluster_node.m_name)) {
+            continue;
+        }
+        Attrs leaked_attrs{
+            {"@link", "cluster_" + std::to_string(dg.m_cluster_order.at(cluster_dg.m_name))}, {"@type", "link"}
+        };
+        Node leaked_node{cluster_node.m_name, std::move(leaked_attrs)};
+        dg.m_nodes.insert_or_assign(cluster_node.m_name, std::move(leaked_node));
+    }
+}
+
 static std::string_view consumeGraphSourceAndUpdateDigraph(Digraph &dg, std::span<tokenizer::Token> &tokens) {
+    const auto og_tokens = tokens;
     if (const auto tok = expectAndConsume(tokens, tokenizer::Token::Type::kwd);
         tok.m_value != KWD_DIGRAPH && tok.m_value != KWD_SUBGRAPH && tok.m_value != KWD_GRAPH) {
         throw UnexpectedTokenException(tok);
     }
+
     std::string_view name;
     if (nextTokenIs(tokens, tokenizer::Token::Type::string)) {
         name = expectAndConsume(tokens, tokenizer::Token::Type::string).m_value;
     }
-    if (name.starts_with("cluster_")) {
-        // TODO handle clusters here
-        throw std::runtime_error("not implemented");
-    }
     expectAndConsume(tokens, tokenizer::Token::Type::lcurly);
+
+    // check if it is a cluster
+    if (name.starts_with("cluster_") || containsClusterTrueAttr(tokens)) {
+        Digraph *cluster_dg;
+        if (dg.m_clusters.contains(name)) {
+            cluster_dg = &dg.m_clusters[name];
+        } else {
+            dg.m_cluster_order.insert_or_assign(name, dg.m_clusters.size());
+            dg.m_clusters.insert_or_assign(name, Digraph{});
+            cluster_dg = &dg.m_clusters[name];
+        }
+        tokens = og_tokens;
+        leakParentNodesInto(*cluster_dg, dg);
+        cluster_dg->constructFromTokens(tokens);
+        leakClusterNodesInto(dg, *cluster_dg);
+        return name;
+    }
+
     while (!tokens.empty() && !nextTokenIs(tokens, tokenizer::Token::Type::rcurly)) {
         consumeStatementAndUpdateDigraph(dg, tokens);
     }
     expectAndConsume(tokens, tokenizer::Token::Type::rcurly);
+
     // everything after the graph is ignored
     return name;
 }
 
 Digraph::Digraph() = default;
 
-Digraph::Digraph(std::string source)
-    : m_source(std::move(source)) {
-    std::vector<tokenizer::Token> tokens_vec = tokenizer::tokenize(*this, m_source);
-    std::span tokens = tokens_vec;
+void Digraph::constructFromTokens(std::span<tokenizer::Token> &tokens) {
     m_name = consumeGraphSourceAndUpdateDigraph(*this, tokens);
     const std::string_view rank_dir = getAttrOrDefault(m_attrs, "rankdir", "TB");
     m_render_attrs.m_rank_dir = RankDirConfig{
@@ -328,8 +429,23 @@ Digraph::Digraph(std::string source)
     };
 }
 
+Digraph::Digraph(std::string source) {
+    m_referenced_sources.emplace_front(std::move(source));
+    auto tokens_vec = tokenizer::tokenize(*this, m_referenced_sources.front());
+    std::span tokens = tokens_vec;
+    constructFromTokens(tokens);
+}
+
 Digraph::Digraph(const std::string_view source)
     : Digraph(std::string(source)) {
+}
+
+void Digraph::update(std::string_view extra_source) {
+    m_referenced_sources.emplace_front(extra_source);
+    extra_source = m_referenced_sources.front();
+    auto tokens_vec = tokenizer::tokenize(*this, extra_source);
+    std::span tokens = tokens_vec;
+    consumeGraphSourceAndUpdateDigraph(*this, tokens);
 }
 
 void Digraph::populateIngoingNodesVectors() {

@@ -15,12 +15,17 @@
 using namespace punkt;
 using namespace punkt::render;
 
+static GLuint getPackedColorFromName(const std::string_view &font_color_str) {
+    uint8_t r, g, b, a;
+    parseColor(font_color_str, r, g, b, a);
+    return (static_cast<GLuint>(a) << 0) | (static_cast<GLuint>(r) << 8) | (static_cast<GLuint>(g) << 16) | (
+               static_cast<GLuint>(b) << 24);
+}
+
 static GLuint getPackedColorFromAttrs(const Attrs &attrs, const std::string_view attr_name,
                                       const std::string_view default_value) {
     const std::string_view &font_color_str = attrs.contains(attr_name) ? attrs.at(attr_name) : default_value;
-    uint8_t r, g, b;
-    parseColor(font_color_str, r, g, b);
-    return (static_cast<GLuint>(r) << 0) | (static_cast<GLuint>(g) << 8) | (static_cast<GLuint>(b) << 16);
+    return getPackedColorFromName(font_color_str);
 }
 
 constexpr GLuint edge_style_solid = 0;
@@ -89,11 +94,16 @@ CharQuadInstanceTracker::CharQuadInstanceTracker(const size_t width, const size_
 }
 
 ShapeQuadInfo::ShapeQuadInfo(const GLuint top_left_x, const GLuint top_left_y, const GLuint fill_color,
-                             const GLuint border_color, const GLuint shape_id, const GLuint border_thickness,
-                             const GLuint width,
-                             const GLuint height)
+                             const GLuint border_color, const GLuint pulsing_color, const GLuint shape_id,
+                             const GLuint border_thickness, const GLuint width, const GLuint height,
+                             const GLfloat rotation_speed, const GLfloat pulsing_speed,
+                             const GLfloat pulsing_time_offset, const GLfloat pulsing_time_offset_gradient_x,
+                             const GLfloat pulsing_time_offset_gradient_y)
     : m_top_left_x(top_left_x), m_top_left_y(top_left_y), m_width(width), m_height(height), m_fill_color(fill_color),
-      m_border_color(border_color), m_shape_id(shape_id), m_border_thickness(border_thickness) {
+      m_border_color(border_color), m_pulsing_color(pulsing_color), m_shape_id(shape_id),
+      m_border_thickness(border_thickness), m_rotation_speed(rotation_speed), m_pulsing_speed(pulsing_speed),
+      m_pulsing_time_offset(pulsing_time_offset), m_pulsing_time_offset_gradient_x(pulsing_time_offset_gradient_x),
+      m_pulsing_time_offset_gradient_y(pulsing_time_offset_gradient_y) {
 }
 
 EdgeLinePoints::EdgeLinePoints(const std::span<const Vector2<size_t>> points, const GLuint packed_color,
@@ -171,6 +181,40 @@ static VAO moveShapeQuadsToBuffer(const std::span<const ShapeQuadInfo> quad_info
     GL_CHECK(glVertexAttribIPointer(5, 1, GL_UNSIGNED_INT,
         static_cast<GLsizei>(sizeof(ShapeQuadInfo)), reinterpret_cast<void *>(7 * sizeof(GLuint))));
     GL_CHECK(glVertexAttribDivisor(5, 1));
+
+    GL_CHECK(glEnableVertexAttribArray(6));
+    GL_CHECK(glVertexAttribIPointer(6, 1, GL_UNSIGNED_INT,
+        static_cast<GLsizei>(sizeof(ShapeQuadInfo)), reinterpret_cast<void *>(8 * sizeof(GLuint))));
+    GL_CHECK(glVertexAttribDivisor(6, 1));
+
+    GL_CHECK(glEnableVertexAttribArray(7));
+    GL_CHECK(glVertexAttribPointer(7, 1, GL_FLOAT, GL_FALSE,
+        static_cast<GLsizei>(sizeof(ShapeQuadInfo)), reinterpret_cast<void *>(9 * sizeof(GLuint))));
+    GL_CHECK(glVertexAttribDivisor(7, 1));
+
+    GL_CHECK(glEnableVertexAttribArray(8));
+    GL_CHECK(glVertexAttribPointer(8, 1, GL_FLOAT, GL_FALSE,
+        static_cast<GLsizei>(sizeof(ShapeQuadInfo)), reinterpret_cast<void *>(9 * sizeof(GLuint) +
+            sizeof(GLfloat))));
+    GL_CHECK(glVertexAttribDivisor(8, 1));
+
+    GL_CHECK(glEnableVertexAttribArray(9));
+    GL_CHECK(glVertexAttribPointer(9, 1, GL_FLOAT, GL_FALSE,
+        static_cast<GLsizei>(sizeof(ShapeQuadInfo)), reinterpret_cast<void *>(9 * sizeof(GLuint) +
+            2 * sizeof(GLfloat))));
+    GL_CHECK(glVertexAttribDivisor(9, 1));
+
+    GL_CHECK(glEnableVertexAttribArray(10));
+    GL_CHECK(glVertexAttribPointer(10, 1, GL_FLOAT, GL_FALSE,
+        static_cast<GLsizei>(sizeof(ShapeQuadInfo)), reinterpret_cast<void *>(9 * sizeof(GLuint) +
+            3 * sizeof(GLfloat))));
+    GL_CHECK(glVertexAttribDivisor(10, 1));
+
+    GL_CHECK(glEnableVertexAttribArray(11));
+    GL_CHECK(glVertexAttribPointer(11, 1, GL_FLOAT, GL_FALSE,
+        static_cast<GLsizei>(sizeof(ShapeQuadInfo)), reinterpret_cast<void *>(9 * sizeof(GLuint) +
+            4 * sizeof(GLfloat))));
+    GL_CHECK(glVertexAttribDivisor(11, 1));
 
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -368,72 +412,6 @@ moveGLQuadsWithCharQuadPerInstanceDataToBuffer(const std::span<const GLQuad> qua
     return vao;
 }
 
-static void checkShaderCompileStatus(const GLuint shader) {
-    GLint success;
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetShaderInfoLog(shader, 512, nullptr, infoLog);
-        std::cerr << "Shader compilation failed: " << infoLog << std::endl;
-    }
-}
-
-static void checkProgramLinkStatus(const GLuint program) {
-    GLint success;
-    glGetProgramiv(program, GL_LINK_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetProgramInfoLog(program, 512, nullptr, infoLog);
-        std::cerr << "Program linking failed: " << infoLog << std::endl;
-    }
-}
-
-static GLuint createShaderProgram(const char *vertex_shader_code, const char *geometry_shader_code,
-                                  const char *fragment_shader_code) {
-    GLuint vertex_shader = 0;
-    if (vertex_shader_code) {
-        vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-        GL_CHECK(glShaderSource(vertex_shader, 1, &vertex_shader_code, nullptr));
-        GL_CHECK(glCompileShader(vertex_shader));
-        checkShaderCompileStatus(vertex_shader);
-    }
-
-    GLuint geometry_shader = 0;
-    if (geometry_shader_code) {
-        geometry_shader = glCreateShader(GL_GEOMETRY_SHADER);
-        GL_CHECK(glShaderSource(geometry_shader, 1, &geometry_shader_code, nullptr));
-        GL_CHECK(glCompileShader(geometry_shader));
-        checkShaderCompileStatus(geometry_shader);
-    }
-
-    GLuint fragment_shader = 0;
-    if (fragment_shader_code) {
-        fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-        GL_CHECK(glShaderSource(fragment_shader, 1, &fragment_shader_code, nullptr));
-        GL_CHECK(glCompileShader(fragment_shader));
-        checkShaderCompileStatus(fragment_shader);
-    }
-
-    const GLuint program = glCreateProgram();
-    if (vertex_shader) {
-        GL_CHECK(glAttachShader(program, vertex_shader));
-    }
-    if (geometry_shader) {
-        GL_CHECK(glAttachShader(program, geometry_shader));
-    }
-    if (fragment_shader) {
-        GL_CHECK(glAttachShader(program, fragment_shader));
-    }
-    GL_CHECK(glLinkProgram(program));
-    checkProgramLinkStatus(program);
-
-    GL_CHECK(glDeleteShader(vertex_shader));
-    GL_CHECK(glDeleteShader(geometry_shader));
-    GL_CHECK(glDeleteShader(fragment_shader));
-
-    return program;
-}
-
 static void populateRendererCharQuads(const std::vector<GlyphQuad> &quads, const size_t x, const size_t y,
                                       const GLuint font_color,
                                       std::unordered_map<glyph::GlyphCharInfo, CharQuadInstanceTracker,
@@ -453,8 +431,44 @@ static void populateRendererCharQuads(const std::vector<GlyphQuad> &quads, const
     }
 }
 
+static void parsePulsingTimeOffset(const Attrs &attrs, GLfloat &out, GLfloat &out_grad_x, GLfloat &out_grad_y) {
+    constexpr std::string_view attr_name = "punktpulsingtimeoffset";
+    const std::string_view str = getAttrOrDefault(attrs, attr_name, "0.0");
+    std::string_view values[3]{};
+    std::string_view::size_type idx = 0, next_idx = str.find(';');
+    for (int i = 0; i < 3; i++) {
+        if (next_idx == std::string_view::npos) {
+            next_idx = str.length();
+        }
+        const std::string_view value = str.substr(idx, next_idx - idx);
+        values[i] = value;
+        idx = next_idx + 1;
+        if (idx >= str.length()) {
+            break;
+        }
+        next_idx = str.substr(idx).find(';');
+    }
+
+    if (values[0].empty()) {
+        out = 0.0f;
+    } else {
+        out = stringViewToFloat(values[0], attr_name);
+    }
+    if (values[1].empty()) {
+        out_grad_x = 0.0f;
+    } else {
+        out_grad_x = stringViewToFloat(values[1], attr_name);
+    }
+    if (values[2].empty()) {
+        out_grad_y = 0.0f;
+    } else {
+        out_grad_y = stringViewToFloat(values[2], attr_name);
+    }
+}
+
 GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
-    : m_dg(dg), m_glyph_loader(glyph_loader), m_zoom(1.0), m_digraph_quad(0, 0, 0, 0, 0, 0, 0, 0) {
+    : m_dg(dg), m_glyph_loader(glyph_loader), m_zoom(1.0),
+      m_digraph_quad(0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f) {
     GLint viewport[4]{};
     GL_CHECK(glGetIntegerv(GL_VIEWPORT, viewport));
     const GLint vw = viewport[2] - viewport[0], vh = viewport[3] - viewport[1];
@@ -481,15 +495,33 @@ GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
     // populate the main digraph quad (border and digraph fill color)
     {
         const GLuint font_color = getPackedColorFromAttrs(dg.m_attrs, font_color_attr, default_font_color);
-        const GLuint fill_color = getPackedColorFromAttrs(dg.m_attrs, "fillcolor", "white");
         const GLuint border_color = getPackedColorFromAttrs(dg.m_attrs, "color", "black");
+        GLuint fill_color;
+        if (dg.m_attrs.contains("fillcolor")) {
+            fill_color = getPackedColorFromAttrs(dg.m_attrs, "fillcolor", "white");
+        } else if (caseInsensitiveEquals(getAttrOrDefault(dg.m_attrs, "style", "normal"), "filled")) {
+            fill_color = border_color;
+        } else {
+            fill_color = getPackedColorFromName("white");
+        }
+        const GLuint pulsing_color = getPackedColorFromAttrs(dg.m_attrs, "punktpulsingcolor", "transparent");
+
+        const GLfloat rotation_speed = static_cast<GLfloat>(getAttrTransformedCheckedOrDefault(
+            dg.m_attrs, "punktrotationspeed", 0.0f, stringViewToFloat));
+        const GLfloat pulsing_speed = static_cast<GLfloat>(getAttrTransformedCheckedOrDefault(
+            dg.m_attrs, "punktpulsingspeed", 0.0f, stringViewToFloat));
+        GLfloat pulsing_time_offset, pulsing_time_offset_gradient_x, pulsing_time_offset_gradient_y;
+        parsePulsingTimeOffset(dg.m_attrs, pulsing_time_offset, pulsing_time_offset_gradient_x, pulsing_time_offset_gradient_y);
 
         // build graph quad (for fill and border)
         m_digraph_quad = ShapeQuadInfo(static_cast<GLuint>(dg.m_render_attrs.m_graph_x),
                                        static_cast<GLuint>(dg.m_render_attrs.m_graph_y), fill_color, border_color,
-                                       node_shape_box, static_cast<GLuint>(dg.m_render_attrs.m_border_thickness),
+                                       pulsing_color, node_shape_box,
+                                       static_cast<GLuint>(dg.m_render_attrs.m_border_thickness),
                                        static_cast<GLuint>(dg.m_render_attrs.m_graph_width),
-                                       static_cast<GLuint>(dg.m_render_attrs.m_graph_height));
+                                       static_cast<GLuint>(dg.m_render_attrs.m_graph_height), rotation_speed,
+                                       pulsing_speed, pulsing_time_offset, pulsing_time_offset_gradient_x,
+                                       pulsing_time_offset_gradient_y);
 
         populateRendererCharQuads(dg.m_render_attrs.m_label_quads, dg.m_render_attrs.m_graph_x,
                                   dg.m_render_attrs.m_graph_y, font_color, m_char_quads);
@@ -499,15 +531,31 @@ GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
 
     for (const Node &node: std::views::values(dg.m_nodes)) {
         GLuint font_color = getPackedColorFromAttrs(node.m_attrs, font_color_attr, default_font_color);
-        const GLuint fill_color = getPackedColorFromAttrs(node.m_attrs, "fillcolor", "white");
         const GLuint border_color = getPackedColorFromAttrs(node.m_attrs, "color", "black");
+        GLuint fill_color;
+        if (node.m_attrs.contains("fillcolor")) {
+            fill_color = getPackedColorFromAttrs(node.m_attrs, "fillcolor", "white");
+        } else if (caseInsensitiveEquals(getAttrOrDefault(node.m_attrs, "style", "normal"), "filled")) {
+            fill_color = border_color;
+        } else {
+            fill_color = getPackedColorFromName("white");
+        }
+        const GLuint pulsing_color = getPackedColorFromAttrs(node.m_attrs, "punktpulsingcolor", "transparent");
+
+        const GLfloat rotation_speed = static_cast<GLfloat>(getAttrTransformedCheckedOrDefault(
+            node.m_attrs, "punktrotationspeed", 0.0f, stringViewToFloat));
+        const GLfloat pulsing_speed = static_cast<GLfloat>(getAttrTransformedCheckedOrDefault(
+            node.m_attrs, "punktpulsingspeed", 0.0f, stringViewToFloat));
+        GLfloat pulsing_time_offset, pulsing_time_offset_gradient_x, pulsing_time_offset_gradient_y;
+        parsePulsingTimeOffset(node.m_attrs, pulsing_time_offset, pulsing_time_offset_gradient_x, pulsing_time_offset_gradient_y);
 
         // build node quad (for fill and border)
         m_node_quads.emplace_back(static_cast<GLuint>(node.m_render_attrs.m_x),
-                                  static_cast<GLuint>(node.m_render_attrs.m_y), fill_color, border_color,
+                                  static_cast<GLuint>(node.m_render_attrs.m_y), fill_color, border_color, pulsing_color,
                                   getNodeShapeId(node), static_cast<GLuint>(node.m_render_attrs.m_border_thickness),
                                   static_cast<GLuint>(node.m_render_attrs.m_width),
-                                  static_cast<GLuint>(node.m_render_attrs.m_height));
+                                  static_cast<GLuint>(node.m_render_attrs.m_height), rotation_speed, pulsing_speed,
+                                  pulsing_time_offset, pulsing_time_offset_gradient_x, pulsing_time_offset_gradient_y);
 
         populateRendererCharQuads(node.m_render_attrs.m_quads, node.m_render_attrs.m_x, node.m_render_attrs.m_y,
                                   font_color, m_char_quads);
@@ -587,16 +635,16 @@ GLRenderer::GLRenderer(const Digraph &dg, glyph::GlyphLoader &glyph_loader)
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     // load shaders
-    m_nodes_shader = createShaderProgram(nodes_vertex_shader_code, nodes_geometry_shader_code,
+    m_nodes_shader = punkt::createShaderProgram(nodes_vertex_shader_code, nodes_geometry_shader_code,
                                          nodes_fragment_shader_code);
-    m_chars_shader = createShaderProgram(chars_vertex_shader_code, chars_geometry_shader_code,
+    m_chars_shader = punkt::createShaderProgram(chars_vertex_shader_code, chars_geometry_shader_code,
                                          chars_fragment_shader_code);
-    m_edges_shader = createShaderProgram(edges_vertex_shader_code, edges_geometry_shader_code,
+    m_edges_shader = punkt::createShaderProgram(edges_vertex_shader_code, edges_geometry_shader_code,
                                          edges_fragment_shader_code);
     // note the use of the normal fragment shader also used for straight edge rendering
-    m_edge_splines_shader = createShaderProgram(edges_bezier_vertex_shader_code, edges_bezier_geometry_shader_code,
+    m_edge_splines_shader = punkt::createShaderProgram(edges_bezier_vertex_shader_code, edges_bezier_geometry_shader_code,
                                                 edges_fragment_shader_code);
-    m_arrows_shader = createShaderProgram(arrows_vertex_shader_code, arrows_geometry_shader_code,
+    m_arrows_shader = punkt::createShaderProgram(arrows_vertex_shader_code, arrows_geometry_shader_code,
                                           arrows_fragment_shader_code);
 
     GL_CRITICAL_CHECK_ALL_ERRORS();
@@ -651,8 +699,8 @@ static double getArrowAngle(const std::span<const Vector2<size_t>> trajectory, c
 }
 
 static Vector2<double> getLineEndPointForArrow(const std::span<const Vector2<size_t>> trajectory,
-                                                      const bool get_min, double &orientation,
-                                                      const double arrow_size) {
+                                               const bool get_min, double &orientation,
+                                               const double arrow_size) {
     assert(trajectory.size() == 4);
     if (trajectory.front().y < trajectory.back().y) {
         if (get_min) {

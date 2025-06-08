@@ -7,6 +7,7 @@
 #include <forward_list>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <functional>
 
 namespace punkt {
@@ -51,7 +52,7 @@ struct Edge {
 struct NodeRenderAttrs {
     size_t m_rank{}, m_width{}, m_height{}, m_border_thickness{}, m_x{}, m_y{};
     float m_barycenter_x{};
-    bool m_is_ghost{};
+    bool m_is_ghost{}, m_is_io_port{};
     std::vector<GlyphQuad> m_quads;
 
     explicit NodeRenderAttrs();
@@ -109,11 +110,14 @@ struct GraphRenderer {
 
 struct Digraph {
     // Digraph takes ownership of the source for safety because there are string_view's to the source everywhere
-    std::string m_source;
-    std::forward_list<std::string> m_generated_sources;
+    Digraph *m_parent{nullptr};
+    std::forward_list<std::string> m_referenced_sources;
     std::string_view m_name;
     Attrs m_default_node_attrs;
     Attrs m_default_edge_attrs;
+    std::unordered_set<size_t> m_io_port_ranks;
+    std::unordered_map<std::string_view, size_t> m_cluster_order;
+    std::unordered_map<std::string_view, Digraph> m_clusters;
     std::unordered_map<std::string_view, Node> m_nodes;
     std::vector<size_t> m_rank_counts;
     std::vector<std::vector<std::string_view> > m_per_rank_orderings;
@@ -133,7 +137,13 @@ struct Digraph {
 
     explicit Digraph(std::string_view source);
 
-    void preprocess(render::glyph::GlyphLoader &glyph_loader, size_t graph_x = 0, size_t graph_y = 0);
+    void update(std::string_view extra_source);
+
+    void preprocess(render::glyph::GlyphLoader &glyph_loader, std::string_view id_in_parent = "");
+
+    void fuseClusterLinksIntoClusterSuperNodes();
+
+    void convertParentLinksToIOPorts(std::string_view id_in_parent);
 
     void computeRanks();
 
@@ -147,13 +157,15 @@ struct Digraph {
 
     void computeNodeLayouts(render::glyph::GlyphLoader &glyph_loader);
 
-    void computeGraphLayout(render::glyph::GlyphLoader &glyph_loader, size_t graph_x, size_t graph_y);
+    void computeGraphLayout(render::glyph::GlyphLoader &glyph_loader);
 
     void optimizeGraphLayout();
 
     void computeEdgeLayout();
 
     void computeEdgeLabelLayouts(render::glyph::GlyphLoader &glyph_loader);
+
+    void constructFromTokens(std::span<tokenizer::Token> &tokens);
 
 private:
     void swapNodesOnRank(std::string_view a, std::string_view b);

@@ -38,6 +38,7 @@ constexpr auto KWD_GRAPH = "graph";
 constexpr bool BARYCENTER_USE_MEDIAN = true;
 constexpr bool BARYCENTER_X_OPTIMIZATION_USE_MEDIAN = true;
 constexpr bool BARYCENTER_SWEEP_DIRECTION_IS_OUTER_LOOP = false;
+constexpr bool BARYCENTER_X_OPTIMIZATION_REORDER_BY_BARYCENTER_X_BEFORE_LEGALIZE = true;
 
 // all this doesn't benefit from being constexpr because it's just magic numbers anyway
 extern float BARYCENTER_ORDERING_FADEOUT;
@@ -80,6 +81,7 @@ struct XOptPipelineStageSettings {
         enum class LegalizationTiming {
             none,
             after_pipeline_stage,
+            after_iteration,
             in_barycenter_operator,
         };
 

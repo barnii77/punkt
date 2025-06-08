@@ -25,9 +25,16 @@ void layout::populateOrderingIndexAtRank(Digraph &dg, const size_t rank) {
 // inputs more coherent in terms of output.
 void layout::populateInitialOrderings(Digraph &dg) {
     for (const Node &node: std::views::values(dg.m_nodes)) {
+        if (dg.m_io_port_ranks.contains(node.m_render_attrs.m_rank)) {
+            continue;
+        }
         dg.m_per_rank_orderings.at(node.m_render_attrs.m_rank).emplace_back(node.m_name);
     }
-    for (auto &ordering: dg.m_per_rank_orderings) {
+    for (size_t i = 0; i < dg.m_per_rank_orderings.size(); i++) {
+        if (dg.m_io_port_ranks.contains(i)) {
+            continue;
+        }
+        auto &ordering = dg.m_per_rank_orderings.at(i);
         std::ranges::sort(ordering);
     }
     // write to dg.m_per_rank_orderings_index maps
@@ -35,6 +42,45 @@ void layout::populateInitialOrderings(Digraph &dg) {
         populateOrderingIndexAtRank(dg, rank);
     }
 }
+
+void layout::reorderRankByBarycenterX(Digraph &dg, const size_t rank, bool &out_improvement_found) {
+    // IO port ranks cannot be reordered
+    if (dg.m_io_port_ranks.contains(rank)) {
+        return;
+    }
+
+    auto &ordering = dg.m_per_rank_orderings.at(rank);
+    std::vector<size_t> rearrangement_order(ordering.size());
+    for (size_t i = 0; i < rearrangement_order.size(); i++) {
+        rearrangement_order[i] = i;
+    }
+    std::ranges::sort(rearrangement_order, [&](const size_t a, const size_t b) {
+        return dg.m_nodes.at(ordering.at(a)).m_render_attrs.m_barycenter_x <
+               dg.m_nodes.at(ordering.at(b)).m_render_attrs.m_barycenter_x;
+    });
+    bool rearrangement_order_has_effect = false;
+    for (size_t i = 0; i < rearrangement_order.size(); i++) {
+        if (rearrangement_order[i] != i) {
+            rearrangement_order_has_effect = true;
+            break;
+        }
+    }
+    if (!rearrangement_order_has_effect) {
+        return;
+    }
+
+    // rearrange orderings vector according to rearrangement order
+    std::vector<std::string_view> rearranged_ordering;
+    rearranged_ordering.reserve(ordering.size());
+    for (const size_t idx: rearrangement_order) {
+        rearranged_ordering.emplace_back(ordering.at(idx));
+    }
+
+    std::swap(ordering, rearranged_ordering);
+    populateOrderingIndexAtRank(dg, rank);
+    out_improvement_found = true;
+}
+
 
 std::unordered_map<uintptr_t, size_t> g_edge_weight_attribute_cache;
 

@@ -2,10 +2,14 @@
 
 #include <cstdint>
 #include <string>
+#include <cassert>
 #include <iostream>
 #include <list>
 #include <unordered_map>
+#include <unordered_set>
 #include <memory>
+
+#include <glad/glad.h>
 
 namespace punkt {
 bool caseInsensitiveEquals(std::string_view lhs, std::string_view rhs);
@@ -16,7 +20,10 @@ size_t stringViewToSizeT(const std::string_view &sv, const std::string_view &att
 
 float stringViewToFloat(const std::string_view &sv, const std::string_view &attr_name);
 
-void parseColor(const std::string_view &color, uint8_t &r, uint8_t &g, uint8_t &b);
+void parseColor(const std::string_view &color, uint8_t &r, uint8_t &g, uint8_t &b, uint8_t &a);
+
+GLuint createShaderProgram(const char *vertex_shader_code, const char *geometry_shader_code,
+                                  const char *fragment_shader_code);
 
 template<typename Key, typename Value, typename KeyHasher, size_t DefaultCapacity = 256>
 struct LRUCache {

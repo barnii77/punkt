@@ -138,8 +138,8 @@ std::vector<Token> punkt::tokenizer::tokenize(Digraph &dg, std::string_view s) {
             assert(advance_by >= 2);
             const size_t n = advance_by - 2;  // remove quotation marks
             if (has_special_chars) {
-                dg.m_generated_sources.emplace_front(accum.begin(), accum.end());
-                out.emplace_back(dg.m_generated_sources.front(), Token::Type::string);
+                dg.m_referenced_sources.emplace_front(accum.begin(), accum.end());
+                out.emplace_back(dg.m_referenced_sources.front(), Token::Type::string);
             } else {
                 out.emplace_back(s.substr(1, n), Token::Type::string);
             }

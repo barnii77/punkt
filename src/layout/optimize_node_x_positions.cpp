@@ -43,6 +43,8 @@ static void forceApartMiddleNodes(Digraph &dg, const float node_sep,
 // TODO remove
 static void printNodeBarycenters(const Digraph &dg, const std::vector<std::string_view> &rank_ordering,
                                  const bool is_pre) {
+    // TODO re-enable printing
+    return;
     for (const auto &n: rank_ordering) {
         const Node &node = dg.m_nodes.at(n);
         std::cout << (is_pre ? "(Pre) " : "(Post) ") << node.m_name << ": " << node.m_render_attrs.m_barycenter_x <<
@@ -74,6 +76,11 @@ static bool isTouchingPrev(const Digraph &dg, const std::vector<std::string_view
 
 // force the barycenter x back between it's left and right neighbours to maintain node order
 static void legalizeBarycenters(Digraph &dg, const size_t rank, const XOptPipelineStageSettings &pss) {
+    if (BARYCENTER_X_OPTIMIZATION_REORDER_BY_BARYCENTER_X_BEFORE_LEGALIZE) {
+        bool trash;
+        reorderRankByBarycenterX(dg, rank, trash);
+    }
+
     const auto &rank_ordering = dg.m_per_rank_orderings.at(rank);
     const auto node_sep = static_cast<float>(dg.m_render_attrs.m_node_sep);
     float mean_before_legalize = 0.0f;
@@ -84,7 +91,9 @@ static void legalizeBarycenters(Digraph &dg, const size_t rank, const XOptPipeli
     printNodeBarycenters(dg, rank_ordering, true);
     forceApartMiddleNodes(dg, node_sep, rank_ordering);
 
-    auto &old_barycenters = g_old_per_rank_barycenters.at(rank);
+    const std::vector old_barycenters_cpy(std::move(g_old_per_rank_barycenters.at(rank)));
+    g_old_per_rank_barycenters[rank] = std::vector<float>(old_barycenters_cpy.size());
+    auto &old_barycenters_glob = g_old_per_rank_barycenters[rank];
 
     for (const bool is_left_sweep: {false, true}) {
         // start the separation process below from the center node for better stability
@@ -127,7 +136,7 @@ static void legalizeBarycenters(Digraph &dg, const size_t rank, const XOptPipeli
                                                       : 1.0f;
             float exploded_node_sep = node_sep;
             if (node_sep_explode_factor != 1.0f && !isTouchingPrev(dg, rank_ordering, is_left_sweep ? i + 1 : i,
-                                                                   g_old_per_rank_barycenters.at(rank))) {
+                                                                   old_barycenters_cpy)) {
                 exploded_node_sep *= node_sep_explode_factor;
             }
 
@@ -138,7 +147,7 @@ static void legalizeBarycenters(Digraph &dg, const size_t rank, const XOptPipeli
             } else {
                 new_barycenter_x = std::max(node.m_render_attrs.m_barycenter_x, prev_x_end + exploded_node_sep);
             }
-            old_barycenters.at(i) = node.m_render_attrs.m_barycenter_x;
+            old_barycenters_glob.at(i) = node.m_render_attrs.m_barycenter_x;
             node.m_render_attrs.m_barycenter_x = new_barycenter_x;
         }
     }
@@ -297,12 +306,27 @@ static void recomputeGraphDimensions(Digraph &dg) {
     }
 }
 
+// legalization pass to make sure the determined node order is respected
+static void runLegalizationPass(Digraph &dg, const XOptPipelineStageSettings &pss,
+                                const bool ignore_missing_ranks = false) {
+    for (size_t rank = 0; rank < dg.m_per_rank_orderings.size(); rank++) {
+        if (ignore_missing_ranks && !g_old_per_rank_barycenters.contains(rank)) {
+            continue;
+        }
+        legalizeBarycenters(dg, rank, pss);
+    }
+}
+
 static bool barycenterIteration(Digraph &dg, const bool is_downward_sweep, const float dampening,
-                                const ssize_t start_rank = -1) {
+                                const XOptPipelineStageSettings &pss, const ssize_t start_rank = -1) {
     bool improvement_found = false;
     float total_change = 0.0f;
     barycenterSweep(dg, is_downward_sweep, improvement_found, total_change, barycenterXOptimizationOperator,
                     BARYCENTER_X_OPTIMIZATION_USE_MEDIAN, dampening, start_rank, start_rank == -1 ? -1 : 1);
+    if (g_pss && g_pss->m_legalizer_settings.m_legalization_timing ==
+        XOptPipelineStageSettings::LegalizerSettings::LegalizationTiming::after_iteration) {
+        runLegalizationPass(dg, pss, true);
+    }
     const float average_change = total_change / static_cast<float>(dg.m_nodes.size());
     return improvement_found || average_change >= BARYCENTER_X_OPTIMIZATION_MIN_AVERAGE_CHANGE_REQUIRED * dampening;
 }
@@ -317,7 +341,7 @@ static void runBarycenterPipelineStage(Digraph &dg, const XOptPipelineStageSetti
             dampening = pss.m_initial_dampening;
             for (ssize_t barycenter_iter = 0; barycenter_iter < pss.m_max_iters || pss.m_max_iters < 0;
                  barycenter_iter++) {
-                if (!barycenterIteration(dg, sweep_settings.m_is_downward_sweep, dampening)) {
+                if (!barycenterIteration(dg, sweep_settings.m_is_downward_sweep, dampening, pss)) {
                     return;
                 }
                 dampening *= pss.m_dampening_fadeout;
@@ -338,7 +362,7 @@ static void runBarycenterPipelineStage(Digraph &dg, const XOptPipelineStageSetti
                     }
                     g_is_downward_barycenter_sweep = sweep_settings.m_is_downward_sweep;
                     g_is_group_barycenter_sweep = sweep_settings.m_is_group_sweep;
-                    if (!barycenterIteration(dg, sweep_settings.m_is_downward_sweep, dampening, i)) {
+                    if (!barycenterIteration(dg, sweep_settings.m_is_downward_sweep, dampening, pss, i)) {
                         return;
                     }
                 }
@@ -351,19 +375,12 @@ static void runBarycenterPipelineStage(Digraph &dg, const XOptPipelineStageSetti
             for (const auto &sweep_settings: pss.m_sweep_settings) {
                 g_is_downward_barycenter_sweep = sweep_settings.m_is_downward_sweep;
                 g_is_group_barycenter_sweep = sweep_settings.m_is_group_sweep;
-                if (!barycenterIteration(dg, sweep_settings.m_is_downward_sweep, dampening)) {
+                if (!barycenterIteration(dg, sweep_settings.m_is_downward_sweep, dampening, pss)) {
                     return;
                 }
                 dampening *= pss.m_dampening_fadeout;
             }
         }
-    }
-}
-
-// legalization pass to make sure the determined node order is respected
-static void runLegalizationPass(Digraph &dg, const XOptPipelineStageSettings &pss) {
-    for (size_t rank = 0; rank < dg.m_per_rank_orderings.size(); rank++) {
-        legalizeBarycenters(dg, rank, pss);
     }
 }
 

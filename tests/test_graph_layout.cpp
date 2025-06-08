@@ -42,10 +42,10 @@ TEST(preprocessing, GraphLayout) {
     // Parse the graph. Let preprocess() compute node ranks and also perform ghost insertion.
     Digraph dg{dot_source};
     render::glyph::GlyphLoader glyph_loader;
-    const size_t og_barycenter_x_optimization_max_iters = BARYCENTER_X_OPTIMIZATION_MAX_ITERS;
-    BARYCENTER_X_OPTIMIZATION_MAX_ITERS = 0;
+    const size_t og_barycenter_x_optimization_max_iters = BARYCENTER_ORDERING_MAX_ITERS_PER_DIRECTION;
+    BARYCENTER_ORDERING_MAX_ITERS_PER_DIRECTION = 0;
     dg.preprocess(glyph_loader);
-    BARYCENTER_X_OPTIMIZATION_MAX_ITERS = og_barycenter_x_optimization_max_iters;
+    BARYCENTER_ORDERING_MAX_ITERS_PER_DIRECTION = og_barycenter_x_optimization_max_iters;
 
     std::stringstream ss;
 
@@ -276,10 +276,10 @@ TEST(preprocessing, GraphLayoutWithEdges) {
     // Parse the graph. Let preprocess() compute node ranks and perform ghost insertion.
     Digraph dg{dot_source};
     render::glyph::GlyphLoader glyph_loader;
-    const size_t og_barycenter_x_optimization_max_iters = BARYCENTER_X_OPTIMIZATION_MAX_ITERS;
-    BARYCENTER_X_OPTIMIZATION_MAX_ITERS = 0;
+    const size_t og_barycenter_x_optimization_max_iters = BARYCENTER_ORDERING_MAX_ITERS_PER_DIRECTION;
+    BARYCENTER_ORDERING_MAX_ITERS_PER_DIRECTION = 0;
     dg.preprocess(glyph_loader);
-    BARYCENTER_X_OPTIMIZATION_MAX_ITERS = og_barycenter_x_optimization_max_iters;
+    BARYCENTER_ORDERING_MAX_ITERS_PER_DIRECTION = og_barycenter_x_optimization_max_iters;
 
     std::stringstream ss;
 
@@ -514,10 +514,10 @@ TEST(preprocessing, GraphLayoutWithEdgeLabels) {
     // Parse the graph. Let preprocess() compute node ranks and perform ghost insertion.
     Digraph dg{dot_source};
     render::glyph::GlyphLoader glyph_loader;
-    const size_t og_barycenter_x_optimization_max_iters = BARYCENTER_X_OPTIMIZATION_MAX_ITERS;
-    BARYCENTER_X_OPTIMIZATION_MAX_ITERS = 0;
+    const size_t og_barycenter_x_optimization_max_iters = BARYCENTER_ORDERING_MAX_ITERS_PER_DIRECTION;
+    BARYCENTER_ORDERING_MAX_ITERS_PER_DIRECTION = 0;
     dg.preprocess(glyph_loader);
-    BARYCENTER_X_OPTIMIZATION_MAX_ITERS = og_barycenter_x_optimization_max_iters;
+    BARYCENTER_ORDERING_MAX_ITERS_PER_DIRECTION = og_barycenter_x_optimization_max_iters;
 
     std::stringstream ss;
 

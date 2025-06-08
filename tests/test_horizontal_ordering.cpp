@@ -1,4 +1,5 @@
 #include "punkt/dot.hpp"
+#include "punkt/dot_constants.hpp"
 #include "punkt/utils/int_types.hpp"
 #include <gtest/gtest.h>
 #include <string>
@@ -8,7 +9,7 @@
 
 using namespace punkt;
 
-extern ssize_t BARYCENTER_ORDERING_MAX_ITERS_PER_DIRECTION;
+// extern ssize_t punkt::BARYCENTER_ORDERING_MAX_ITERS_PER_DIRECTION;
 
 TEST(preprocessing, OptimalHorizontalOrdering) {
     // This DOT source defines our layered DAG.
@@ -94,6 +95,7 @@ TEST(preprocessing, OptimalHorizontalOrdering) {
 TEST(preprocessing, WeightWorks) {
     const std::string dot_source = R"(
         digraph G {
+            punktxopt=false;
             A; B; C;
             D; E; F;
             G; H; I;

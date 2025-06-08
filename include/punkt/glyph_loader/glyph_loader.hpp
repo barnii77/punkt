@@ -56,7 +56,8 @@ using GlyphLoaderFontDataT = std::variant<PSF1GlyphsT>;
 class GlyphLoader {
     bool m_is_real_loader{}, m_in_load_mode{};
     FontType m_font_type{FontType::none};
-    GLuint m_pre_load_mode_enter_framebuffer{}, m_render_framebuffer{};
+    GLuint m_pre_load_mode_enter_framebuffer{}, m_render_framebuffer{}, m_quad_vao{};
+    GLuint m_ttf_stencil_shader{}, m_ttf_cover_shader{};
     size_t m_max_allowed_font_size{1024};
     std::string m_font_path;
     std::string m_raw_font_data;
@@ -74,6 +75,8 @@ class GlyphLoader {
     void loadGlyph(char32_t c, size_t font_size);
 
     void parseFontData();
+
+    void loadAndCompileShaders();
 
 public:
     // avoids actually loading the glyph if it's not already loaded

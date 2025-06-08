@@ -3,8 +3,11 @@
 
 in vec4 frag_fill_color;
 in vec4 frag_border_color;
+in vec4 frag_pulsing_color;
 in vec2 frag_node_coord;
 in vec2 frag_node_size;
+in float frag_pulsing_speed;
+in float frag_pulsing_time_offset;
 flat in uint frag_node_shape;
 flat in uint frag_border_thickness;
 
@@ -13,6 +16,11 @@ out vec4 frag_color;
 #define NODE_SHAPE_NONE 0u  // default behavior -> handled by default case
 #define NODE_SHAPE_BOX 1u
 #define NODE_SHAPE_ELLIPSE 2u
+
+vec4 applySpecialEffects(vec4 color) {
+    float strength = max(sin(time * frag_pulsing_speed + 2 * PI * frag_pulsing_time_offset), 0.0f);
+    return mix(color, frag_pulsing_color, strength);
+}
 
 void main() {
     frag_color = vec4(0.0f);
@@ -34,4 +42,5 @@ void main() {
         default:
             frag_color = frag_fill_color;
     }
+    frag_color = applySpecialEffects(frag_color);
 }

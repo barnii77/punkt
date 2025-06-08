@@ -126,7 +126,7 @@ static GLFWwindow *setupGL() {
     glfwMakeContextCurrent(window);
     gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress));
     // TODO add cli argument to disable vsync by setting the parameter here to 0
-    glfwSwapInterval(1);
+    glfwSwapInterval(0);
 
     return window;
 }
@@ -150,7 +150,7 @@ void punktRun(const char *graph_source_cstr, const char *font_path_relative_to_p
                                                               std::string(font_path)
                                                           }
                                                           : new punkt::render::glyph::GlyphLoader{};
-    dg.preprocess(*glyph_loader);
+    dg.preprocess(*glyph_loader, "");
     dg.m_renderer.initialize(dg, *glyph_loader);
 #ifndef PUNKT_REMOVE_FPS_COUNTER
     fpsCounterInit();

@@ -26,9 +26,9 @@ static void populateGraphLabelText(const Attrs &attrs, const TextAlignment label
     }
 }
 
-void Digraph::computeGraphLayout(render::glyph::GlyphLoader &glyph_loader, const size_t graph_x, const size_t graph_y) {
-    m_render_attrs.m_graph_x = graph_x;
-    m_render_attrs.m_graph_y = graph_y;
+void Digraph::computeGraphLayout(render::glyph::GlyphLoader &glyph_loader) {
+    m_render_attrs.m_graph_x = 0;
+    m_render_attrs.m_graph_y = 0;
     m_render_attrs.m_rank_sep = getAttrTransformedCheckedOrDefault(m_attrs, "ranksep", default_rank_sep,
                                                                    stringViewToSizeT);
     m_render_attrs.m_node_sep = getAttrTransformedCheckedOrDefault(m_attrs, "nodesep", default_node_sep,

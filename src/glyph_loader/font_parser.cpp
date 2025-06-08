@@ -49,6 +49,7 @@ GlyphLoader::GlyphLoader(std::string font_path)
         font_file.read(m_raw_font_data.data(), file_size);
     }
     parseFontData();
+    loadAndCompileShaders();
 }
 
 void GlyphLoader::parseFontData() {

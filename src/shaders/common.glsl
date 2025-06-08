@@ -3,14 +3,17 @@ uniform vec2 camera_pos;
 uniform float zoom;
 uniform int is_sideways;
 uniform int is_reversed;
+uniform float time;
+
+#define PI 3.14159265358979323f
 
 #define SMOOTH_LT_ANTIALIASING_INTERPOLATION_SCALE 10.0f
 
 vec4 unpackColor(uint color) {
-    float r = float((color >> 0) & 0xFFU) / 255.0f;
-    float g = float((color >> 8) & 0xFFU) / 255.0f;
-    float b = float((color >> 16) & 0xFFU) / 255.0f;
-    float a = 1.0f;
+    float a = float((color >> 0) & 0xFFU) / 255.0f;
+    float r = float((color >> 8) & 0xFFU) / 255.0f;
+    float g = float((color >> 16) & 0xFFU) / 255.0f;
+    float b = float((color >> 24) & 0xFFU) / 255.0f;
     return vec4(r, g, b, a);
 }
 

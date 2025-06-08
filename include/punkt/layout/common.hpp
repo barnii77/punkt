@@ -44,6 +44,7 @@ void populateOrderingIndexAtRank(Digraph &dg, size_t rank);
 
 void populateInitialOrderings(Digraph &dg);
 
+void reorderRankByBarycenterX(Digraph &dg, size_t rank, bool &out_improvement_found);
 
 using BarycenterSweepOperatorFunc = std::function<void(Digraph &, std::vector<float>, std::vector<float>, size_t,
                                                        bool &)>;

@@ -1,0 +1,77 @@
+digraph SparseMLP {
+    node[punktpulsingcolor=blue, punktpulsingspeed=1.0, punktpulsingtimeoffset="0.0;0.25;0.5", punktrotationspeed=1.0];
+    // Lay out graph from left to right
+    rankdir=LR;
+    #node [shape=circle];
+
+    // Define Layer 0 with 5 nodes on the same horizontal rank
+    subgraph L0 {
+        rank = same;
+        L0_0; L0_1; L0_2; L0_3; L0_4;
+    }
+
+    // Define Layer 1 with 5 nodes on the same horizontal rank
+    subgraph L1 {
+        rank = same;
+        L1_0; L1_1; L1_2; L1_3; L1_4;
+    }
+
+    // Define Layer 2 with 5 nodes on the same horizontal rank
+    subgraph L2 {
+        rank = same;
+        L2_0; L2_1; L2_2; L2_3; L2_4;
+    }
+
+    // Define Layer 3 with 5 nodes on the same horizontal rank
+    subgraph L3 {
+        rank = same;
+        L3_0; L3_1; L3_2; L3_3; L3_4;
+    }
+
+    // Connections from Layer 0 to Layer 1 (sparse, but out-of-order)
+    L0_0 -> L1_1;
+    L0_0 -> L1_2;
+    L0_1 -> L1_0;
+    L0_1 -> L1_3;
+    L0_2 -> L1_2;
+    L0_2 -> L1_4;
+    L0_3 -> L1_0;
+    L0_3 -> L1_1;
+    L0_4 -> L1_3;
+    L0_4 -> L1_4;
+
+    // Connections from Layer 1 to Layer 2
+    L1_0 -> L2_1;
+    L1_1 -> L2_0;
+    L1_1 -> L2_2;
+    L1_2 -> L2_1;
+    L1_2 -> L2_3;
+    L1_3 -> L2_2;
+    L1_4 -> L2_0;
+    L1_4 -> L2_4;
+
+    // Connections from Layer 2 to Layer 3
+    L2_0 -> L3_2;
+    L2_1 -> L3_0;
+    L2_1 -> L3_3;
+    L2_2 -> L3_1;
+    L2_2 -> L3_4;
+    L2_3 -> L3_0;
+    L2_3 -> L3_1;
+    L2_4 -> L3_3;
+
+    // Skip and non-sequential connections to increase complexity:
+    // Skip from Layer 0 to Layer 2
+    L0_0 -> L2_4;
+    L0_4 -> L2_0;
+
+    // Skip from Layer 1 to Layer 3
+    L1_2 -> L3_2;
+    L1_3 -> L3_4;
+
+    // Additional cross-layer connection for x–positioning stress
+    L0_1 -> L3_1;
+
+    // A backward connection (using the 'back' direction as a hint)
+    L2_2 -> L1_4 [dir=back];
+}

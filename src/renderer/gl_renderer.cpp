@@ -3,6 +3,8 @@
 #include "punkt/gl_error.hpp"
 
 #include <glad/glad.h>
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
 
 #include <cassert>
 #include <ranges>
@@ -58,9 +60,9 @@ static void resetGLState() {
     GL_CHECK(glUseProgram(0));
 }
 
-// TODO spline edges
 void GLRenderer::renderFrame() {
     GL_CHECK(glClear(GL_COLOR_BUFFER_BIT));
+    double time = glfwGetTime();
 
     // draw graph/cluster/node shapes (in that order)
     GL_CHECK(glUseProgram(m_nodes_shader));
@@ -75,23 +77,24 @@ void GLRenderer::renderFrame() {
     GL_CHECK(
         glUniform1i(glGetUniformLocation(m_nodes_shader, "is_sideways"), static_cast<GLint>(m_dg.m_render_attrs.
             m_rank_dir.m_is_sideways)));
+    GL_CHECK(glUniform1f(glGetUniformLocation(m_nodes_shader, "time"), static_cast<GLfloat>(time)));
 
-    // graph
+    // draw graph
     GL_CHECK(glBindVertexArray(m_digraph_quad_buffer));
     GL_CHECK(glDrawArraysInstanced(GL_POINTS, 0, 1, 1));
 
-    // clusters
+    // draw clusters
     GL_CHECK(glBindVertexArray(m_cluster_quads_buffer));
     GL_CHECK(glDrawArraysInstanced(GL_POINTS, 0, 1, static_cast<GLsizei>(m_cluster_quads.size())));
 
-    // nodes
+    // draw nodes
     GL_CHECK(glBindVertexArray(m_node_quad_buffer));
     GL_CHECK(glDrawArraysInstanced(GL_POINTS, 0, 1, static_cast<GLsizei>(m_node_quads.size())));
 
     resetGLState();
 
+    // draw edges
     for (const bool is_splines_pass: {false, true}) {
-        // draw edges
         if (is_splines_pass) {
             GL_CHECK(glUseProgram(m_edge_splines_shader));
         } else {
@@ -106,6 +109,7 @@ void GLRenderer::renderFrame() {
             static_cast<GLint>(m_dg.m_render_attrs.m_rank_dir.m_is_reversed)));
         GL_CHECK(glUniform1i(glGetUniformLocation(m_edges_shader, "is_sideways"),
             static_cast<GLint>(m_dg.m_render_attrs.m_rank_dir.m_is_sideways)));
+        GL_CHECK(glUniform1f(glGetUniformLocation(m_edges_shader, "time"), static_cast<GLfloat>(time)));
 
         if (is_splines_pass) {
             GL_CHECK(glBindVertexArray(m_edge_splines_buffer));
@@ -132,13 +136,14 @@ void GLRenderer::renderFrame() {
     GL_CHECK(
         glUniform1i(glGetUniformLocation(m_arrows_shader, "is_sideways"), static_cast<GLint>(m_dg.m_render_attrs.
             m_rank_dir.m_is_sideways)));
+    GL_CHECK(glUniform1f(glGetUniformLocation(m_arrows_shader, "time"), static_cast<GLfloat>(time)));
 
     GL_CHECK(glBindVertexArray(m_arrow_triangles_buffer));
     GL_CHECK(glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(m_edge_arrow_triangles.size())));
 
     resetGLState();
 
-    // preload all glyphs (glyph loader, for efficiency, requires us to put it into loading mode, where it messes with
+    // Preload all glyphs (glyph loader, for efficiency, requires us to put it into loading mode, where it messes with
     // our opengl context, and thus we have to separate this out into a preloading stage). This may look weird because
     // it doesn't seem as if we are loading anything, but m_glyph_loader.getGlyph(...) actually populates the glyph
     // loaders internal glyph cache, meaning we won't do any rendering next time we call it (i.e. in the text rendering
@@ -167,6 +172,7 @@ void GLRenderer::renderFrame() {
     GL_CHECK(
         glUniform1i(glGetUniformLocation(m_chars_shader, "is_sideways"), static_cast<GLint>(m_dg.m_render_attrs.
             m_rank_dir.m_is_sideways)));
+    GL_CHECK(glUniform1f(glGetUniformLocation(m_chars_shader, "time"), static_cast<GLfloat>(time)));
 
     for (const auto &gci: std::views::keys(m_char_quads)) {
         const auto [c, font_size_zoomed] = transformGciForZoom(gci, m_zoom);

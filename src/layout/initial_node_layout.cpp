@@ -66,6 +66,10 @@ void Node::populateRenderInfo(render::glyph::GlyphLoader &glyph_loader, const Ra
 
         m_render_attrs.m_width = edge_thickness;
         return;
+    } else if (type == "link") {
+        m_render_attrs.m_width = 1;
+        m_render_attrs.m_height = 1;
+        return;
     }
 
     size_t max_line_width, y;

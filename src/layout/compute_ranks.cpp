@@ -78,7 +78,8 @@ static size_t applyConstraints(size_t rank, Digraph &dg, const Node &node,
 }
 
 // max(parent.rank foreach parent) + 1
-static size_t getRank(Digraph &dg, const Node &node, const std::unordered_set<std::string_view> &processed_nodes) {
+static size_t getInitialRank(Digraph &dg, const Node &node,
+                             const std::unordered_set<std::string_view> &processed_nodes) {
     size_t max_rank = 0;
     for (const auto &ingoing_edge: node.m_ingoing) {
         const Node &parent = dg.m_nodes.at(ingoing_edge.get().m_source);
@@ -86,6 +87,27 @@ static size_t getRank(Digraph &dg, const Node &node, const std::unordered_set<st
     }
     const size_t node_rank = max_rank >= max_rank_range_start ? max_rank - 1 : max_rank + 1;
     return applyConstraints(node_rank, dg, node, processed_nodes);
+}
+
+// Set rank to min(child.rank foreach child, node.rank) - 1.
+// This is so that a parent-less node connected to another one won't have unnecessarily long connections and instead,
+//  the parent is pulled towards the child because the child is constrained to where it is (at the numerically lowest
+//  rank it is allowed to be), but the parent isn't yet at the numerically highest rank it is allowed to be towards its
+//  children.
+static void contractRank(const Digraph &dg, Node &node) {
+    // Skip all nodes with constraints on them
+    if (const std::string_view constraints = getAttrOrDefault(node.m_attrs, "@constraints", "");
+        !constraints.empty()) {
+        return;
+    }
+
+    // Set rank to min(child.rank foreach child, node.rank) - 1.
+    size_t min_rank = max_rank_range_start;
+    for (const auto &outgoing_edge: node.m_outgoing) {
+        const Node &child = dg.m_nodes.at(outgoing_edge.m_dest);
+        min_rank = std::min(min_rank, child.m_render_attrs.m_rank);
+    }
+    node.m_render_attrs.m_rank = min_rank >= max_rank_range_start ? node.m_render_attrs.m_rank : min_rank - 1;
 }
 
 static void normalizeRanks(Digraph &dg) {
@@ -107,10 +129,13 @@ static void normalizeRanks(Digraph &dg) {
 
 void Digraph::computeRanks() {
     std::unordered_set<std::string_view> processed_nodes;
-    for (const std::vector<std::reference_wrapper<Node> > sorted_nodes = topoSortNodes(*this);
-         auto node: std::ranges::reverse_view(sorted_nodes)) {
-        node.get().m_render_attrs.m_rank = getRank(*this, node, processed_nodes);
+    const std::vector<std::reference_wrapper<Node> > sorted_nodes = topoSortNodes(*this);
+    for (auto node: std::ranges::reverse_view(sorted_nodes)) {
+        node.get().m_render_attrs.m_rank = getInitialRank(*this, node, processed_nodes);
         processed_nodes.emplace(node.get().m_name);
+    }
+    for (auto node: sorted_nodes) {
+        contractRank(*this, node);
     }
     normalizeRanks(*this);
     for (const Node &node: std::views::values(m_nodes)) {

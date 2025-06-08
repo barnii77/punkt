@@ -14,35 +14,7 @@ using namespace punkt::layout;
 static void barycenterSweepReorderOperator(Digraph &dg, std::vector<float> new_barycenters,
                                            std::vector<float> old_barycenters, const size_t rank,
                                            bool &out_improvement_found) {
-    std::vector<size_t> rearrangement_order(new_barycenters.size());
-    for (size_t i = 0; i < rearrangement_order.size(); i++) {
-        rearrangement_order[i] = i;
-    }
-    std::ranges::sort(rearrangement_order, [&](const size_t a, const size_t b) {
-        return new_barycenters.at(a) < new_barycenters.at(b);
-    });
-    bool rearrangement_order_has_effect = false;
-    for (size_t i = 0; i < rearrangement_order.size(); i++) {
-        if (rearrangement_order[i] != i) {
-            rearrangement_order_has_effect = true;
-            break;
-        }
-    }
-    if (!rearrangement_order_has_effect) {
-        return;
-    }
-
-    // rearrange orderings vector according to rearrangement order
-    auto &ordering = dg.m_per_rank_orderings.at(rank);
-    std::vector<std::string_view> rearranged_ordering;
-    rearranged_ordering.reserve(ordering.size());
-    for (const size_t idx: rearrangement_order) {
-        rearranged_ordering.emplace_back(ordering.at(idx));
-    }
-
-    std::swap(ordering, rearranged_ordering);
-    populateOrderingIndexAtRank(dg, rank);
-    out_improvement_found = true;
+    reorderRankByBarycenterX(dg, rank, out_improvement_found);
 }
 
 static bool barycenterIteration(Digraph &dg, const bool is_downward_sweep, const float dampening) {
@@ -87,6 +59,12 @@ void Digraph::computeHorizontalOrderings() {
 
     // init with empty ordering vector for every rank
     m_per_rank_orderings.resize(m_rank_counts.size());
+    // hacky trick to move the per-rank orderings of IO ports (if there are any) to the bottom
+    if (m_io_port_ranks.size() == 2) {
+        std::swap(m_per_rank_orderings.at(1), m_per_rank_orderings.at(m_per_rank_orderings.size() - 1));
+    } else if (m_io_port_ranks.size() == 1 && !m_io_port_ranks.contains(0)) {
+        std::swap(m_per_rank_orderings.at(0), m_per_rank_orderings.at(m_per_rank_orderings.size() - 1));
+    }
     m_per_rank_orderings_index.resize(m_rank_counts.size());
     populateInitialOrderings(*this);
 
@@ -106,6 +84,10 @@ void Digraph::computeHorizontalOrderings() {
     // reorder bubble-sort style until no adjacent node swap increases the score
     std::vector<float> rank_scores(m_per_rank_orderings.size());
     for (size_t rank = 0; rank < rank_scores.size(); rank++) {
+        // IO port ranks are skipped
+        if (m_io_port_ranks.contains(rank)) {
+            continue;
+        }
         rank_scores[rank] = getRankOrderingScore(*this, rank);
     }
     for (ssize_t bubble_ordering_iter = 0; bubble_ordering_iter < BUBBLE_ORDERING_MAX_ITERS ||
@@ -115,6 +97,10 @@ void Digraph::computeHorizontalOrderings() {
         // each iteration, we loop over every rank and every node in each rank in order and try to swap it with its
         // neighbour to the right. If that improves the score, we keep the change, otherwise, we discard it.
         for (size_t rank = 0; rank < m_per_rank_orderings.size(); rank++) {
+            // IO port ranks are skipped
+            if (m_io_port_ranks.contains(rank)) {
+                continue;
+            }
             rank_scores[rank] = getRankOrderingScore(*this, rank);
 
             for (size_t node_idx = 0; node_idx < m_per_rank_orderings.at(rank).size() - 1; node_idx++) {

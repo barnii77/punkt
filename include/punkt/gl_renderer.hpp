@@ -36,11 +36,19 @@ struct ShapeQuadInfo {
     GLuint m_height;
     GLuint m_fill_color;
     GLuint m_border_color;
+    GLuint m_pulsing_color;
     GLuint m_shape_id;
     GLuint m_border_thickness;
+    GLfloat m_rotation_speed;
+    GLfloat m_pulsing_speed;
+    GLfloat m_pulsing_time_offset;
+    GLfloat m_pulsing_time_offset_gradient_x;
+    GLfloat m_pulsing_time_offset_gradient_y;
 
-    ShapeQuadInfo(GLuint top_left_x, GLuint top_left_y, GLuint fill_color, GLuint border_color,
-                  GLuint shape_id, GLuint border_thickness, GLuint width, GLuint height);
+    ShapeQuadInfo(GLuint top_left_x, GLuint top_left_y, GLuint fill_color, GLuint border_color, GLuint m_pulsing_color,
+                  GLuint shape_id, GLuint border_thickness, GLuint width, GLuint height, GLfloat rotation_speed,
+                  GLfloat pulsing_speed, GLfloat pulsing_time_offset, GLfloat pulsing_time_offset_gradient_x,
+                  GLfloat pulsing_time_offset_gradient_y);
 };
 
 struct EdgeLinePoints {

@@ -29,7 +29,7 @@ function(initialize_env)
     endif ()
     set(RELEASE_MODE ${release_mode} PARENT_SCOPE)
 
-    if (${release_mode})
+    if (release_mode)
         # in Release mode, bake font into executable by default
         set(punkt_bake_font_into_executable_default ON)
         set(punkt_remove_fps_counter_default ON)
@@ -190,6 +190,8 @@ function(generate_shader_code_header)
     add_shader_pair_to_shader_header_content(edges)
     add_shader_pair_to_shader_header_content(edges_bezier)
     add_shader_pair_to_shader_header_content(arrows)
+    add_shader_pair_to_shader_header_content(glyph_loader/ttf_cover_shader)
+    add_shader_pair_to_shader_header_content(glyph_loader/ttf_stencil_shader)
 
     file(GENERATE
             OUTPUT "${GENERATED_DIR}/punkt/shaders/shaders.hpp"
@@ -241,6 +243,7 @@ add_library(punkt
         src/parser/dot_tokenizer.cpp
         src/parser/dot_parser.cpp
         src/layout/compute_ranks.cpp
+        src/layout/handle_link_nodes.cpp
         src/layout/insert_ghost_nodes.cpp
         src/layout/order_nodes_horizontally.cpp
         src/layout/initial_node_layout.cpp
@@ -278,14 +281,14 @@ target_include_directories(punkt PRIVATE ${GENERATED_PARENT_DIR})
 target_link_libraries(punkt PRIVATE glfw)
 target_link_libraries(punkt PRIVATE glad)
 target_compile_definitions(punkt PRIVATE $<$<CONFIG:Release>:PUNKT_RELEASE_BUILD>)
-if (${PUNKT_REMOVE_FPS_COUNTER})
+if (PUNKT_REMOVE_FPS_COUNTER)
     target_compile_definitions(punkt PRIVATE PUNKT_REMOVE_FPS_COUNTER)
 endif ()
 
 # codegen
 generate_shader_code_header()
 generate_color_map_header()
-if (${PUNKT_BAKE_FONT_INTO_EXECUTABLE})
+if (PUNKT_BAKE_FONT_INTO_EXECUTABLE)
     generate_font_data_header()
     target_compile_definitions(punkt PRIVATE PUNKT_BAKE_FONT_INTO_EXECUTABLE)
 endif ()

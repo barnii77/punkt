@@ -20,7 +20,7 @@
 } while(0)
 #endif
 
-// contrary to GL_CHECK, this is not optimized out in release builds
+// Contrary to GL_CHECK, this is not removed in release builds
 #define GL_CRITICAL_CHECK_ALL_ERRORS() do { \
     GLenum err = glGetError(); \
     if (err != GL_NO_ERROR) { \

@@ -1,6 +1,7 @@
 #include "punkt/dot.hpp"
 #include "punkt/utils/utils.hpp"
 #include "punkt/dot_constants.hpp"
+#include "punkt/gl_error.hpp"
 #include "generated/punkt/color_map.hpp"
 
 #include <numeric>
@@ -81,7 +82,7 @@ float punkt::stringViewToFloat(const std::string_view &sv, const std::string_vie
     return result;
 }
 
-void punkt::parseColor(const std::string_view &color, uint8_t &r, uint8_t &g, uint8_t &b) {
+void punkt::parseColor(const std::string_view &color, uint8_t &r, uint8_t &g, uint8_t &b, uint8_t &a) {
     if (color.starts_with("#")) {
         // rgb color
         if (color.size() != 7 ||
@@ -93,6 +94,7 @@ void punkt::parseColor(const std::string_view &color, uint8_t &r, uint8_t &g, ui
         r = static_cast<uint8_t>(stringViewToSizeTHex(color.substr(1, 3), "color@red"));
         g = static_cast<uint8_t>(stringViewToSizeTHex(color.substr(3, 5), "color@green"));
         b = static_cast<uint8_t>(stringViewToSizeTHex(color.substr(5, 7), "color@blue"));
+        a = static_cast<uint8_t>(stringViewToSizeTHex(color.substr(7, 9), "color@alpha"));
     } else {
         // look it up in color map
         uint32_t packed;
@@ -102,9 +104,10 @@ void punkt::parseColor(const std::string_view &color, uint8_t &r, uint8_t &g, ui
         } else {
             packed = color_name_to_rgb.at(color);
         }
-        r = (packed >> 16) & 0xFF;
-        g = (packed >> 8) & 0xFF;
-        b = (packed >> 0) & 0xFF;
+        r = (packed >> 24) & 0xFF;
+        g = (packed >> 16) & 0xFF;
+        b = (packed >> 8) & 0xFF;
+        a = (packed >> 0) & 0xFF;
     }
 }
 
@@ -153,3 +156,70 @@ double punkt::bezierCurveLength(const double p0_x, const double p0_y, const doub
 
     return total_length;
 }
+
+static void checkShaderCompileStatus(const GLuint shader) {
+    GLint success;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetShaderInfoLog(shader, 512, nullptr, infoLog);
+        std::cerr << "Shader compilation failed: " << infoLog << std::endl;
+    }
+}
+
+static void checkProgramLinkStatus(const GLuint program) {
+    GLint success;
+    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetProgramInfoLog(program, 512, nullptr, infoLog);
+        std::cerr << "Program linking failed: " << infoLog << std::endl;
+    }
+}
+
+GLuint punkt::createShaderProgram(const char *vertex_shader_code, const char *geometry_shader_code,
+                                  const char *fragment_shader_code) {
+    GLuint vertex_shader = 0;
+    if (vertex_shader_code) {
+        vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+        GL_CHECK(glShaderSource(vertex_shader, 1, &vertex_shader_code, nullptr));
+        GL_CHECK(glCompileShader(vertex_shader));
+        checkShaderCompileStatus(vertex_shader);
+    }
+
+    GLuint geometry_shader = 0;
+    if (geometry_shader_code) {
+        geometry_shader = glCreateShader(GL_GEOMETRY_SHADER);
+        GL_CHECK(glShaderSource(geometry_shader, 1, &geometry_shader_code, nullptr));
+        GL_CHECK(glCompileShader(geometry_shader));
+        checkShaderCompileStatus(geometry_shader);
+    }
+
+    GLuint fragment_shader = 0;
+    if (fragment_shader_code) {
+        fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+        GL_CHECK(glShaderSource(fragment_shader, 1, &fragment_shader_code, nullptr));
+        GL_CHECK(glCompileShader(fragment_shader));
+        checkShaderCompileStatus(fragment_shader);
+    }
+
+    const GLuint program = glCreateProgram();
+    if (vertex_shader) {
+        GL_CHECK(glAttachShader(program, vertex_shader));
+    }
+    if (geometry_shader) {
+        GL_CHECK(glAttachShader(program, geometry_shader));
+    }
+    if (fragment_shader) {
+        GL_CHECK(glAttachShader(program, fragment_shader));
+    }
+    GL_CHECK(glLinkProgram(program));
+    checkProgramLinkStatus(program);
+
+    GL_CHECK(glDeleteShader(vertex_shader));
+    GL_CHECK(glDeleteShader(geometry_shader));
+    GL_CHECK(glDeleteShader(fragment_shader));
+
+    return program;
+}
+
